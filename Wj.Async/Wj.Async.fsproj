@@ -44,7 +44,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Library1.fs" />
+    <Compile Include="IDeferred.fs" />
+    <Compile Include="IVar.fs" />
+    <Compile Include="IDispatcher.fs" />
+    <Compile Include="ThreadDispatcher.fsi" />
+    <Compile Include="ThreadDispatcher.fs" />
+    <Compile Include="Deferred.fsi" />
+    <Compile Include="Deferred.fs" />
+    <Compile Include="Dispatcher.fsi" />
+    <Compile Include="Dispatcher.fs" />
     <None Include="Script.fsx" />
   </ItemGroup>
   <PropertyGroup>
