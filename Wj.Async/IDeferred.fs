@@ -1,7 +1,7 @@
 ﻿namespace Wj.Async
 
 [<Interface>]
-type IDeferred<'a> =
+type 'a IDeferred =
   abstract member Upon : callback : ('a -> unit) -> unit
   abstract member Get : unit -> 'a
   abstract member TryGet : unit -> 'a option

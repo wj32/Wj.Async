@@ -1,7 +1,7 @@
 ﻿namespace Wj.Async
 
 [<Interface>]
-type INode<'a> =
-  inherit IDeferred<'a>
+type 'a INode =
+  inherit ('a IDeferred)
 
   abstract member Link : parent : 'a IDeferred -> unit

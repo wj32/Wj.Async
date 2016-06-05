@@ -201,7 +201,7 @@ module Deferred =
           | Unlinked _ -> false
           | Linked parent -> isDetermined (T<'a>.FindRoot(parent))
 
-      interface INode<'a> with
+      interface 'a INode with
         member t.Link(parent) =
           match t.state with
           | Unlinked unlinked ->
