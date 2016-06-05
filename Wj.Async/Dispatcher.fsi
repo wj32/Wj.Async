@@ -2,9 +2,8 @@
 
 module Dispatcher =
   // IDispatcher functions
-  val enqueue : IDispatcher -> (unit -> unit) -> unit
-  val run : IDispatcher -> (unit -> 'a IDeferred) -> 'a
+  val enqueue : IDispatcher -> supervisor : ISupervisor -> f : (unit -> unit) -> unit
+  val run : IDispatcher -> f : (unit -> 'a IDeferred) -> 'a
 
   val current : unit -> IDispatcher
-  val tryCurrent : unit -> IDispatcher option
   val create : unit -> IDispatcher

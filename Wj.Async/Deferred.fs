@@ -10,6 +10,7 @@ module Deferred =
 
   // IDeferred functions
   let upon (t : _ IDeferred) f = t.Upon(f)
+  let upon' (t : _ IDeferred) (supervisor, f) = t.Upon(supervisor, f)
   let get (t : _ IDeferred) = t.Get()
   let tryGet (t : _ IDeferred) = t.TryGet()
   let isDetermined (t : _ IDeferred) = t.IsDetermined
@@ -17,13 +18,15 @@ module Deferred =
   let set (t : _ IVar) x = t.Set(x)
   let trySet (t : _ IVar) x = t.TrySet(x)
   // INode functions
+  let isLinked (t : _ INode) = t.IsLinked
   let link (t : _ INode) d = t.Link(d)
+  let tryLink (t : _ INode) d = t.TryLink(d)
 
   module private Var =
     [<ReferenceEqualityAttribute>]
     type 'a Pending =
       { dispatcher : IDispatcher;
-        mutable callbacks : ('a -> unit) list; }
+        mutable callbacks : (ISupervisor * ('a -> unit)) list; }
 
     [<ReferenceEqualityAttribute>]
     type 'a State =
@@ -35,10 +38,14 @@ module Deferred =
       { mutable state : 'a State; }
 
       interface 'a IDeferred with
-        member t.Upon(f) =
+        member t.Upon(f) = (t :> _ IDeferred).Upon(ThreadShared.currentSupervisor (), f)
+
+        member t.Upon(supervisor, f) =
           match t.state with
-          | Pending pending -> pending.callbacks <- f :: pending.callbacks
-          | Done x -> (ThreadDispatcher.current ()).Enqueue(fun () -> f x)
+          | Pending pending -> pending.callbacks <- (supervisor, f) :: pending.callbacks
+          | Done x ->
+            let dispatcher = ThreadShared.currentDispatcher ()
+            dispatcher.Enqueue(supervisor, fun () -> f x)
 
         member t.Get() =
           match t.state with
@@ -65,13 +72,15 @@ module Deferred =
           | Pending pending ->
             t.state <- Done x
             let callbacks = List.rev pending.callbacks
-            pending.dispatcher.Enqueue(fun () -> callbacks |> List.iter (fun f -> f x))
+            callbacks |> List.iter (fun (supervisor, f) ->
+              pending.dispatcher.Enqueue(supervisor, fun () -> f x)
+            )
             true
           | Done _ -> false
 
     let createPending dispatcher =
       { state = Pending
-          { dispatcher = ThreadDispatcher.current ();
+          { dispatcher = ThreadShared.currentDispatcher ();
             callbacks = []; }; }
 
     let createDone x = { state = Done x; }
@@ -84,6 +93,8 @@ module Deferred =
       interface 'a IDeferred with
         member t.Upon(f) = ()
 
+        member t.Upon(supervisor, f) = ()
+
         member t.Get() = invalidOp DeferredNotDetermined
 
         member t.TryGet() = None
@@ -95,7 +106,7 @@ module Deferred =
   module private Mapping =
     [<ReferenceEqualityAttribute>]
     type State<'a, 'b> =
-      | Pending of parent:'a IDeferred * mapping:('a -> 'b)
+      | Pending of parent : 'a IDeferred * mappingSupervisor : ISupervisor * mapping : ('a -> 'b)
       | Done of 'b
 
     [<ReferenceEqualityAttribute>]
@@ -103,10 +114,13 @@ module Deferred =
       { mutable state : State<'a, 'b>; }
 
       interface 'b IDeferred with
-        member t.Upon(f) =
+        member t.Upon(f) = (t :> _ IDeferred).Upon(ThreadShared.currentSupervisor (), f)
+
+        member t.Upon(supervisor, f) =
+          let dispatcher = ThreadShared.currentDispatcher ()
           match t.state with
-          | Pending (parent, mapping) ->
-            upon parent (fun x ->
+          | Pending (parent, mappingSupervisor, mapping) ->
+            upon' parent (mappingSupervisor, (fun x ->
               let y =
                 match t.state with
                 | Pending _ ->
@@ -114,9 +128,10 @@ module Deferred =
                   t.state <- Done y
                   y
                 | Done y -> y
-              f y
-            )
-          | Done y -> (ThreadDispatcher.current ()).Enqueue(fun () -> f y)
+              dispatcher.Enqueue(supervisor, fun () -> f y)
+            ))
+          | Done y ->
+            dispatcher.Enqueue(supervisor, fun () -> f y)
 
         member t.Get() =
           match t.state with
@@ -133,12 +148,13 @@ module Deferred =
           | Pending _ -> false
           | Done y -> true
 
-    let create parent mapping = { state = Pending (parent, mapping); }
+    let create parent mapping =
+      { state = Pending (parent, ThreadShared.currentSupervisor (), mapping); }
 
   module private Node =
     [<ReferenceEqualityAttribute>]
     type 'a Unlinked =
-      { mutable callbacks : ('a -> unit) list; }
+      { mutable callbacks : (ISupervisor * ('a -> unit)) list; }
 
     [<ReferenceEqualityAttribute>]
     type 'a State =
@@ -181,10 +197,12 @@ module Deferred =
         | _ -> d
 
       interface 'a IDeferred with
-        member t.Upon(f) =
+        member t.Upon(f) = (t :> _ IDeferred).Upon(ThreadShared.currentSupervisor (), f)
+
+        member t.Upon(supervisor, f) =
           match t.state with
-          | Unlinked unlinked -> unlinked.callbacks <- f :: unlinked.callbacks
-          | Linked parent -> upon (T<'a>.FindRoot(parent)) f
+          | Unlinked unlinked -> unlinked.callbacks <- (supervisor, f) :: unlinked.callbacks
+          | Linked parent -> upon' (T<'a>.FindRoot(parent)) (supervisor, f)
 
         member t.Get() =
           match t.state with
@@ -202,13 +220,23 @@ module Deferred =
           | Linked parent -> isDetermined (T<'a>.FindRoot(parent))
 
       interface 'a INode with
+        member t.IsLinked =
+          match t.state with
+          | Unlinked _ -> false
+          | Linked _ -> true
+
         member t.Link(parent) =
+          if not ((t :> _ INode).TryLink(parent)) then
+            invalidOp NodeAlreadyLinked
+
+        member t.TryLink(parent) =
           match t.state with
           | Unlinked unlinked ->
             let root = T<'a>.FindRoot(parent)
-            unlinked.callbacks |> List.iter (upon root)
+            unlinked.callbacks |> List.iter (upon' root)
             t.state <- Linked root
-          | Linked _ -> invalidOp NodeAlreadyLinked
+            true
+          | Linked _ -> false
 
     let create () =
       { state = Unlinked
@@ -216,7 +244,7 @@ module Deferred =
 
   let create x = Var.createDone x :> _ IDeferred
 
-  let createVar () = Var.createPending (ThreadDispatcher.current ()) :> _ IVar
+  let createVar () = Var.createPending (ThreadShared.currentDispatcher ()) :> _ IVar
 
   let createNode () = Node.create () :> _ INode
 

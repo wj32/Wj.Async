@@ -3,6 +3,6 @@
 open System
 
 module Clock =
-  val after : TimeSpan -> unit IDeferred
-  val afterMs : int -> unit IDeferred
-  val at : DateTime -> unit IDeferred
+  val after : span : TimeSpan -> unit IDeferred
+  val afterMs : ms : int -> unit IDeferred
+  val at : time : DateTime -> unit IDeferred

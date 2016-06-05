@@ -4,28 +4,31 @@ open System.Threading.Tasks;
 
 module Deferred =
   // IDeferred functions
-  val upon : 'a IDeferred -> ('a -> unit) -> unit
+  val upon : 'a IDeferred -> callback : ('a -> unit) -> unit
+  val upon' : 'a IDeferred -> supervisor : ISupervisor * callback : ('a -> unit) -> unit
   val get : 'a IDeferred -> 'a
   val tryGet : 'a IDeferred -> 'a option
   val isDetermined : 'a IDeferred -> bool
   // IVar functions
-  val set : 'a IVar -> 'a -> unit
-  val trySet : 'a IVar -> 'a -> bool
+  val set : 'a IVar -> value : 'a -> unit
+  val trySet : 'a IVar -> value : 'a -> bool
   // INode functions
-  val link : 'a INode -> 'a IDeferred -> unit
+  val isLinked : 'a INode -> bool
+  val link : 'a INode -> parent : 'a IDeferred -> unit
+  val tryLink : 'a INode -> parent : 'a IDeferred -> bool
 
-  val create : 'a -> 'a IDeferred
+  val create : value : 'a -> 'a IDeferred
   val createVar : unit -> 'a IVar
   val createNode : unit -> 'a INode
   val unit : unit IDeferred
   val never : unit -> 'a IDeferred
 
   // Monad
-  val ``return`` : 'a -> 'a IDeferred // Same as create
-  val bind : 'a IDeferred -> ('a -> 'b IDeferred) -> 'b IDeferred
+  val ``return`` : value : 'a -> 'a IDeferred // Same as create
+  val bind : 'a IDeferred -> f : ('a -> 'b IDeferred) -> 'b IDeferred
 
   // Standard monad functions
-  val map : 'a IDeferred -> ('a -> 'b) -> 'b IDeferred
+  val map : 'a IDeferred -> f : ('a -> 'b) -> 'b IDeferred
   val join : 'a IDeferred IDeferred -> 'a IDeferred
   val forget : 'a IDeferred -> unit IDeferred
   val all : 'a IDeferred list -> 'a list IDeferred

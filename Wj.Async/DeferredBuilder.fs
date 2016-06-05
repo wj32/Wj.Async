@@ -34,12 +34,16 @@ type DeferredBuilder() =
 
   member this.Run(f) = f ()
 
+  member this.TryFinally(body, finalizer) =
+    Supervisor.tryFinally body (fun () -> finalizer (); Deferred.unit)
+
+  member this.TryWith(body, handler) =
+    Supervisor.tryWith body handler Supervisor.AfterDetermined.Log
+
   member this.Using(disposable : #IDisposable, body) =
-    Deferred.map (body disposable) (fun x ->
-      if disposable <> null then
-        disposable.Dispose()
-      x
-    )
+    Supervisor.tryFinally
+      (fun () -> body disposable)
+      (fun () -> (if disposable <> null then disposable.Dispose()); Deferred.unit)
 
   member this.While(guard, body) =
     if guard () then

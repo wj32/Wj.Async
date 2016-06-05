@@ -5,53 +5,56 @@ open System.Threading;
 
 module Dispatcher =
   // IDispatcher functions
-  let enqueue (t : IDispatcher) f = t.Enqueue(f)
+  let enqueue (t : IDispatcher) supervisor f = t.Enqueue(supervisor, f)
   let run (t : IDispatcher) f = t.Run(f)
 
   [<ReferenceEqualityAttribute>]
   type T =
-    { queue : (unit -> unit) Queue;
+    { queue : (ISupervisor * (unit -> unit)) Queue;
       queueLock : obj; }
 
     interface IDispatcher with
-      member t.Enqueue(f) =
+      member t.Enqueue(supervisor, f) =
         lock t.queueLock (fun () ->
-          t.queue.Enqueue(f)
+          t.queue.Enqueue((supervisor, f))
           Monitor.Pulse(t.queueLock)
         )
 
       member t.Run(f) =
-        ThreadDispatcher.push (t :> IDispatcher)
-        let d = f ()
-        d.Upon(fun _ ->
-          lock t.queueLock (fun () ->
-            Monitor.Pulse(t.queueLock)
+        let supervisor = Supervisor.root
+        ThreadShared.pushSupervisor supervisor
+        try
+          ThreadShared.pushDispatcher (t :> IDispatcher)
+          let d = f ()
+          d.Upon(fun _ ->
+            lock t.queueLock (fun () ->
+              Monitor.Pulse(t.queueLock)
+            )
           )
-        )
-        let rec loop () =
-          let f = lock t.queueLock (fun () ->
-            while t.queue.Count = 0 && not d.IsDetermined do
-              Monitor.Wait(t.queueLock) |> ignore
-            if t.queue.Count <> 0 then
-              Some (t.queue.Dequeue())
-            else
-              None
-          )
-          match f with
-          | Some f ->
-            f ()
-            loop ()
-          | None ->
-            d.Get()
-        let result = loop ()
-        ThreadDispatcher.pop (t :> IDispatcher)
-        result
+          let rec loop () =
+            let f = lock t.queueLock (fun () ->
+              while t.queue.Count = 0 && not d.IsDetermined do
+                Monitor.Wait(t.queueLock) |> ignore
+              if t.queue.Count <> 0 then
+                Some (t.queue.Dequeue())
+              else
+                None
+            )
+            match f with
+            | Some (supervisor, f) ->
+              supervisor.Run(f)
+              loop ()
+            | None ->
+              d.Get()
+          let result = loop ()
+          ThreadShared.popDispatcher (t :> IDispatcher)
+          result
+        finally
+          ThreadShared.popSupervisor supervisor
 
-  let current () = ThreadDispatcher.current ()
-
-  let tryCurrent () = ThreadDispatcher.tryCurrent ()
+  let current () = ThreadShared.currentDispatcher ()
 
   let create () =
-    { queue = new Queue<unit -> unit>();
+    { queue = new Queue<ISupervisor * (unit -> unit)>();
       queueLock = new obj(); }
     :> IDispatcher
