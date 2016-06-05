@@ -4,6 +4,10 @@ open System.Collections.Generic;
 open System.Threading;
 
 module Dispatcher =
+  // IDispatcher functions
+  let enqueue (t : IDispatcher) f = t.Enqueue(f)
+  let run (t : IDispatcher) d = t.Run(d)
+
   [<ReferenceEqualityAttribute>]
   type T =
     { queue : (unit -> unit) Queue;
@@ -51,6 +55,3 @@ module Dispatcher =
     { queue = new Queue<unit -> unit>();
       queueLock = new obj(); }
     :> IDispatcher
-
-  let enqueue (t : IDispatcher) f = t.Enqueue(f)
-  let run (t : IDispatcher) d = t.Run(d)

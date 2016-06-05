@@ -3,6 +3,7 @@
 
 #load "IDeferred.fs"
 #load "IVar.fs"
+#load "INode.fs"
 #load "IDispatcher.fs"
 #load "ThreadDispatcher.fs"
 #load "Deferred.fs"

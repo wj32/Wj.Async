@@ -4,5 +4,5 @@
 type IVar<'a> =
   inherit IDeferred<'a>
 
-  abstract member Set : 'a -> unit
-  abstract member TrySet : 'a -> bool
+  abstract member Set : value:'a -> unit
+  abstract member TrySet : value:'a -> bool

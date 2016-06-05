@@ -3,20 +3,25 @@
 open System.Threading.Tasks;
 
 module Deferred =
-  // Interface functions
+  // IDeferred functions
   val upon : 'a IDeferred -> ('a -> unit) -> unit
   val get : 'a IDeferred -> 'a
   val tryGet : 'a IDeferred -> 'a option
   val isDetermined : 'a IDeferred -> bool
+  // IVar functions
+  val set : 'a IVar -> 'a -> unit
+  val trySet : 'a IVar -> 'a -> bool
+  // INode functions
+  val link : 'a INode -> 'a IDeferred -> unit
 
-  val value : 'a -> 'a IDeferred
+  val create : 'a -> 'a IDeferred
   val createVar : unit -> 'a IVar
-
+  val createNode : unit -> 'a INode
   val unit : unit IDeferred
   val never : unit -> 'a IDeferred
 
   // Monad
-  val lift : 'a -> 'a IDeferred // Same as value
+  val lift : 'a -> 'a IDeferred // Same as create
   val bind : 'a IDeferred -> ('a -> 'b IDeferred) -> 'b IDeferred
 
   // Standard monad functions
@@ -33,6 +38,7 @@ module Deferred =
   val anyUnit : 'a IDeferred list -> unit IDeferred
   val dontWaitFor : unit IDeferred -> unit
 
+  // Conversion
   val ofAsync : 'a Async -> unit Async * 'a IDeferred
   val ofTask : 'a Task -> 'a IDeferred
   val ofTaskUnit : Task -> unit IDeferred

@@ -4,7 +4,22 @@ open System;
 open System.Threading.Tasks;
 
 module Deferred =
-  module Var =
+  let [<Literal>] private DeferredNotDetermined = "The deferred result is not yet determined."
+  let [<Literal>] private VarAlreadySet = "The variable is already set."
+  let [<Literal>] private NodeAlreadyLinked = "The node has already been joined."
+
+  // IDeferred functions
+  let upon (t : _ IDeferred) f = t.Upon(f)
+  let get (t : _ IDeferred) = t.Get()
+  let tryGet (t : _ IDeferred) = t.TryGet()
+  let isDetermined (t : _ IDeferred) = t.IsDetermined
+  // IVar functions
+  let set (t : _ IVar) x = t.Set(x)
+  let trySet (t : _ IVar) x = t.TrySet(x)
+  // INode functions
+  let link (t : _ INode) d = t.Link(d)
+
+  module private Var =
     [<ReferenceEqualityAttribute>]
     type 'a Pending =
       { dispatcher : IDispatcher;
@@ -14,48 +29,45 @@ module Deferred =
     type 'a State =
       | Pending of 'a Pending
       | Done of 'a
-      | Never
 
     [<ReferenceEqualityAttribute>]
     type 'a T =
       { mutable state : 'a State; }
 
-      interface IDeferred<'a> with
+      interface 'a IDeferred with
         member t.Upon f =
           match t.state with
           | Pending pending -> pending.callbacks <- f :: pending.callbacks
           | Done x -> (ThreadDispatcher.current ()).Enqueue(fun () -> f x)
-          | Never -> ()
 
         member t.Get () =
           match t.state with
-          | Pending _ | Never -> invalidOp "The deferred result is not yet available."
+          | Pending _ -> invalidOp DeferredNotDetermined
           | Done x -> x
 
         member t.TryGet () =
           match t.state with
-          | Pending _ | Never -> None
+          | Pending _ -> None
           | Done x -> Some x
 
         member t.IsDetermined =
           match t.state with
-          | Pending _ | Never -> false
+          | Pending _ -> false
           | Done _ -> true
 
-      interface IVar<'a> with
+      interface 'a IVar with
         member t.Set x =
-          if not ((t :> IVar<'a>).TrySet(x)) then
-            invalidOp "The variable is already set."
+          if not ((t :> 'a IVar).TrySet(x)) then
+            invalidOp VarAlreadySet
 
         member t.TrySet x =
           match t.state with
           | Pending pending ->
-            let callbacks = List.rev pending.callbacks
             t.state <- Done x
+            let callbacks = List.rev pending.callbacks
             pending.dispatcher.Enqueue(fun () -> callbacks |> List.iter (fun f -> f x))
             true
           | Done _ -> false
-          | Never -> invalidOp "This variable cannot be set."
 
     let createPending dispatcher =
       { state = Pending
@@ -64,52 +76,162 @@ module Deferred =
 
     let createDone x = { state = Done x; }
 
-    let createNever () = { state = Never; }
+  module private Never =
+    [<ReferenceEqualityAttribute>]
+    type 'a T =
+      | Never
 
-  module Mapped =
+      interface 'a IDeferred with
+        member t.Upon f = ()
+
+        member t.Get () = invalidOp DeferredNotDetermined
+
+        member t.TryGet () = None
+
+        member t.IsDetermined = false
+
+    let create () = Never
+
+  module private Mapping =
+    [<ReferenceEqualityAttribute>]
+    type State<'a, 'b> =
+      | Pending of parent:'a IDeferred * mapping:('a -> 'b)
+      | Done of 'b
+
     [<ReferenceEqualityAttribute>]
     type T<'a, 'b> =
-      { parent : 'a IDeferred;
-        mapping : 'a -> 'b; }
+      { mutable state : State<'a, 'b>; }
 
-      interface IDeferred<'b> with
-        member t.Upon f = t.parent.Upon(fun x -> f (t.mapping x))
+      interface 'b IDeferred with
+        member t.Upon f =
+          match t.state with
+          | Pending (parent, mapping) ->
+            upon parent (fun x ->
+              let y =
+                match t.state with
+                | Pending _ ->
+                  let y = mapping x
+                  t.state <- Done y
+                  y
+                | Done y -> y
+              f y
+            )
+          | Done y -> (ThreadDispatcher.current ()).Enqueue(fun () -> f y)
 
-        member t.Get () = t.mapping (t.parent.Get())
+        member t.Get () =
+          match t.state with
+          | Pending _ -> invalidOp DeferredNotDetermined
+          | Done y -> y
 
-        member t.TryGet () = Option.map t.mapping (t.parent.TryGet())
+        member t.TryGet () =
+          match t.state with
+          | Pending _ -> None
+          | Done y -> Some y
 
-        member t.IsDetermined = t.parent.IsDetermined
+        member t.IsDetermined =
+          match t.state with
+          | Pending _ -> false
+          | Done y -> true
 
-    let create parent mapping =
-      { parent = parent;
-        mapping = mapping; }
+    let create parent mapping = { state = Pending (parent, mapping); }
 
-  let upon (t : _ IDeferred) f = t.Upon(f)
-  let get (t : _ IDeferred) = t.Get()
-  let tryGet (t : _ IDeferred) = t.TryGet()
-  let isDetermined (t : _ IDeferred) = t.IsDetermined
-  let set (t : _ IVar) x = t.Set(x)
-  let trySet (t : _ IVar) x = t.TrySet(x)
+  module private Node =
+    [<ReferenceEqualityAttribute>]
+    type 'a Unlinked =
+      { mutable callbacks : ('a -> unit) list; }
 
-  let value x = Var.createDone x :> _ IDeferred
+    [<ReferenceEqualityAttribute>]
+    type 'a State =
+      /// The node has no parent.
+      | Unlinked of 'a Unlinked
+      /// The node has a parent IDeferred.
+      /// Due to FindRoot, the parent will always be an Unlinked or not a Node.T at all (but never a
+      /// Linked).
+      | Linked of parent:'a IDeferred
+
+    [<ReferenceEqualityAttribute>]
+    type 'a T =
+      { mutable state : 'a State; }
+
+      static member private FindRoot (d : 'a IDeferred) =
+        let rec findRoot (d : 'a IDeferred) =
+          match d with
+          | :? ('a T) as t ->
+            match t.state with
+            | Unlinked _ -> d
+            | Linked parent -> findRoot parent
+          | _ -> d
+        let rec updateParent (d : 'a IDeferred) root =
+          match d with
+          | :? ('a T) as t ->
+            match t.state with
+            | Unlinked _ -> ()
+            | Linked parent ->
+              t.state <- Linked root
+              updateParent parent root
+          | _ -> ()
+        match d with
+        | :? ('a T) as t ->
+          match t.state with
+          | Unlinked _ -> d
+          | Linked parent ->
+            let root = findRoot parent
+            updateParent t root
+            root
+        | _ -> d
+
+      interface 'a IDeferred with
+        member t.Upon f =
+          match t.state with
+          | Unlinked unlinked -> unlinked.callbacks <- f :: unlinked.callbacks
+          | Linked parent -> upon (T<'a>.FindRoot(parent)) f
+
+        member t.Get () =
+          match t.state with
+          | Unlinked _ -> invalidOp DeferredNotDetermined
+          | Linked parent -> get (T<'a>.FindRoot(parent))
+
+        member t.TryGet () =
+          match t.state with
+          | Unlinked _ -> invalidOp DeferredNotDetermined
+          | Linked parent -> tryGet (T<'a>.FindRoot(parent))
+
+        member t.IsDetermined =
+          match t.state with
+          | Unlinked _ -> false
+          | Linked parent -> isDetermined (T<'a>.FindRoot(parent))
+
+      interface INode<'a> with
+        member t.Link parent =
+          match t.state with
+          | Unlinked unlinked ->
+            let root = T<'a>.FindRoot(parent)
+            unlinked.callbacks |> List.iter (upon root)
+            t.state <- Linked root
+          | Linked _ -> invalidOp NodeAlreadyLinked
+
+    let create () =
+      { state = Unlinked
+          { callbacks = []; }; }
+
+  let create x = Var.createDone x :> _ IDeferred
 
   let createVar () = Var.createPending (ThreadDispatcher.current ()) :> _ IVar
 
-  let unit = value ()
+  let createNode () = Node.create () :> _ INode
 
-  let never () = Var.createNever () :> _ IDeferred
+  let unit = create ()
 
-  let lift x = value x
+  let never () = Never.create () :> _ IDeferred
 
-  let bind (t : _ IDeferred) (f : _ -> _ IDeferred) =
-    // TODO: For infinite deferred loops, space usage grows linearly due to a long backwards chain
-    // of these temporary vars.
-    let v = createVar ()
-    upon t (fun x -> upon (f x) (fun y -> set v y))
+  let lift x = create x
+
+  let bind t (f : _ -> _ IDeferred) =
+    let v = createNode ()
+    upon t (fun x -> link v (f x))
     v :> _ IDeferred
 
-  let map t f = Mapped.create t f :> _ IDeferred
+  let map t f = Mapping.create t f :> _ IDeferred
 
   let join t = bind t id
 
