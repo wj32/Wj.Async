@@ -35,6 +35,7 @@ module Deferred =
   val both : 'a IDeferred -> 'b IDeferred -> ('a * 'b) IDeferred
   val allUnit : unit IDeferred list -> unit IDeferred
   val any : 'a IDeferred list -> 'a IDeferred
+  val anyi : 'a IDeferred list -> ('a * int) IDeferred
   val anyUnit : 'a IDeferred list -> unit IDeferred
   val dontWaitFor : unit IDeferred -> unit
 

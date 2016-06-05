@@ -280,6 +280,11 @@ module Deferred =
     ts |> List.iter (fun t -> upon t (trySet v >> ignore))
     v :> _ IDeferred
 
+  let anyi (ts : _ IDeferred list) =
+    let v = createVar ()
+    ts |> List.iteri (fun i t -> upon t (fun x -> trySet v (x, i) |> ignore))
+    v :> _ IDeferred
+
   let anyUnit (ts : _ IDeferred list) = map (any ts) ignore
 
   let dontWaitFor (t : unit IDeferred) = ()
