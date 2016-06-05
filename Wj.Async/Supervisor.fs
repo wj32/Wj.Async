@@ -106,6 +106,14 @@ module Supervisor =
   module AfterDetermined =
     type T = Raise | Log | Ignore
 
+    let dontRaise t = if t = Raise then Log else t
+
+  let raiseAfterDetermined afterDetermined ex =
+    match afterDetermined with
+    | AfterDetermined.Raise -> systemRaise ex
+    | AfterDetermined.Log -> stderr.WriteLine(sprintf "Unhandled exception after tryWith:\n%s" (string ex))
+    | AfterDetermined.Ignore -> ()
+
   let tryWith' name (f : unit -> _ IDeferred) (handler : Exception -> _ IDeferred) afterDetermined =
     let v = Deferred.createVar ()
     let mutable exceptionOccurred = false
@@ -113,15 +121,10 @@ module Supervisor =
     detach t
     uponException t (fun ex ->
       if Deferred.isDetermined v then
-        match afterDetermined with
-        | AfterDetermined.Raise -> systemRaise ex
-        | AfterDetermined.Log -> System.Diagnostics.Debug.WriteLine(ex)
-        | AfterDetermined.Ignore -> ()
+        raiseAfterDetermined afterDetermined ex
       else
         if exceptionOccurred then
-          match afterDetermined with
-          | AfterDetermined.Raise | AfterDetermined.Ignore -> ()
-          | AfterDetermined.Log -> System.Diagnostics.Debug.WriteLine(ex)
+          raiseAfterDetermined (AfterDetermined.dontRaise afterDetermined) ex
         else
           exceptionOccurred <- true
           Deferred.upon (handler ex) (fun x -> Deferred.set v x)
