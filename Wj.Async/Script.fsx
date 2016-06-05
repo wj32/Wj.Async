@@ -8,6 +8,7 @@
 #load "ThreadDispatcher.fs"
 #load "Deferred.fs"
 #load "Dispatcher.fs"
+#load "Clock.fs"
 
 open Wj.Async
 open System.Threading.Tasks
@@ -15,20 +16,11 @@ open System.Threading.Tasks
 let dispatcher = Dispatcher.create ()
 
 Dispatcher.run dispatcher (fun () ->
-  let waitTwoSeconds () =
-    let myTask = Task.Run(fun () ->
-        printfn "Waiting 2 seconds..."
-      )
-    let myTask = myTask.ContinueWith(fun _ ->
-        System.Threading.Tasks.Task.Delay(2000)
-      )
-    let myTask = TaskExtensions.Unwrap(myTask)
-    Deferred.ofTaskUnit myTask
   let root =
-    Deferred.bind (waitTwoSeconds ()) (fun () ->
+    Deferred.bind (Clock.afterMs 2000) (fun () ->
       printfn "Done!"
       let rec loop counter =
-        Deferred.bind (waitTwoSeconds ()) (fun () ->
+        Deferred.bind (Clock.afterMs 2000) (fun () ->
           printfn "After another 2 seconds: iteration %d" counter
           loop (counter + 1)
         )

@@ -54,6 +54,8 @@
     <Compile Include="Deferred.fs" />
     <Compile Include="Dispatcher.fsi" />
     <Compile Include="Dispatcher.fs" />
+    <Compile Include="Clock.fsi" />
+    <Compile Include="Clock.fs" />
     <None Include="Script.fsx" />
   </ItemGroup>
   <PropertyGroup>
