@@ -21,7 +21,7 @@ module Deferred =
   val never : unit -> 'a IDeferred
 
   // Monad
-  val lift : 'a -> 'a IDeferred // Same as create
+  val ``return`` : 'a -> 'a IDeferred // Same as create
   val bind : 'a IDeferred -> ('a -> 'b IDeferred) -> 'b IDeferred
 
   // Standard monad functions
@@ -42,3 +42,10 @@ module Deferred =
   val ofAsync : 'a Async -> unit Async * 'a IDeferred
   val ofTask : 'a Task -> 'a IDeferred
   val ofTaskUnit : Task -> unit IDeferred
+
+  module Infix =
+    // Standard monad operators
+    val (>>=) : 'a IDeferred -> ('a -> 'b IDeferred) -> 'b IDeferred
+    val (>>|) : 'a IDeferred -> ('a -> 'b) -> 'b IDeferred
+
+    val (>>>) : 'a IDeferred -> ('a -> unit) -> unit

@@ -35,17 +35,17 @@ module Deferred =
       { mutable state : 'a State; }
 
       interface 'a IDeferred with
-        member t.Upon f =
+        member t.Upon(f) =
           match t.state with
           | Pending pending -> pending.callbacks <- f :: pending.callbacks
           | Done x -> (ThreadDispatcher.current ()).Enqueue(fun () -> f x)
 
-        member t.Get () =
+        member t.Get() =
           match t.state with
           | Pending _ -> invalidOp DeferredNotDetermined
           | Done x -> x
 
-        member t.TryGet () =
+        member t.TryGet() =
           match t.state with
           | Pending _ -> None
           | Done x -> Some x
@@ -56,11 +56,11 @@ module Deferred =
           | Done _ -> true
 
       interface 'a IVar with
-        member t.Set x =
+        member t.Set(x) =
           if not ((t :> 'a IVar).TrySet(x)) then
             invalidOp VarAlreadySet
 
-        member t.TrySet x =
+        member t.TrySet(x) =
           match t.state with
           | Pending pending ->
             t.state <- Done x
@@ -82,11 +82,11 @@ module Deferred =
       | Never
 
       interface 'a IDeferred with
-        member t.Upon f = ()
+        member t.Upon(f) = ()
 
-        member t.Get () = invalidOp DeferredNotDetermined
+        member t.Get() = invalidOp DeferredNotDetermined
 
-        member t.TryGet () = None
+        member t.TryGet() = None
 
         member t.IsDetermined = false
 
@@ -103,7 +103,7 @@ module Deferred =
       { mutable state : State<'a, 'b>; }
 
       interface 'b IDeferred with
-        member t.Upon f =
+        member t.Upon(f) =
           match t.state with
           | Pending (parent, mapping) ->
             upon parent (fun x ->
@@ -118,12 +118,12 @@ module Deferred =
             )
           | Done y -> (ThreadDispatcher.current ()).Enqueue(fun () -> f y)
 
-        member t.Get () =
+        member t.Get() =
           match t.state with
           | Pending _ -> invalidOp DeferredNotDetermined
           | Done y -> y
 
-        member t.TryGet () =
+        member t.TryGet() =
           match t.state with
           | Pending _ -> None
           | Done y -> Some y
@@ -181,17 +181,17 @@ module Deferred =
         | _ -> d
 
       interface 'a IDeferred with
-        member t.Upon f =
+        member t.Upon(f) =
           match t.state with
           | Unlinked unlinked -> unlinked.callbacks <- f :: unlinked.callbacks
           | Linked parent -> upon (T<'a>.FindRoot(parent)) f
 
-        member t.Get () =
+        member t.Get() =
           match t.state with
           | Unlinked _ -> invalidOp DeferredNotDetermined
           | Linked parent -> get (T<'a>.FindRoot(parent))
 
-        member t.TryGet () =
+        member t.TryGet() =
           match t.state with
           | Unlinked _ -> invalidOp DeferredNotDetermined
           | Linked parent -> tryGet (T<'a>.FindRoot(parent))
@@ -202,7 +202,7 @@ module Deferred =
           | Linked parent -> isDetermined (T<'a>.FindRoot(parent))
 
       interface INode<'a> with
-        member t.Link parent =
+        member t.Link(parent) =
           match t.state with
           | Unlinked unlinked ->
             let root = T<'a>.FindRoot(parent)
@@ -224,7 +224,7 @@ module Deferred =
 
   let never () = Never.create () :> _ IDeferred
 
-  let lift x = create x
+  let ``return`` x = create x
 
   let bind t (f : _ -> _ IDeferred) =
     let v = createNode ()
@@ -301,3 +301,10 @@ module Deferred =
     let v = createVar ()
     task.ContinueWith(Action<Task>(fun _ -> v.Set(()))) |> ignore
     v :> _ IDeferred
+
+  module Infix =
+    let (>>=) t f = bind t f
+
+    let (>>|) t f = map t f
+
+    let (>>>) t f = upon t f

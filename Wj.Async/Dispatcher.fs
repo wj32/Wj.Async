@@ -14,13 +14,13 @@ module Dispatcher =
       queueLock : obj; }
 
     interface IDispatcher with
-      member t.Enqueue f =
+      member t.Enqueue(f) =
         lock t.queueLock (fun () ->
           t.queue.Enqueue(f)
           Monitor.Pulse(t.queueLock)
         )
 
-      member t.Run f =
+      member t.Run(f) =
         ThreadDispatcher.push (t :> IDispatcher)
         let d = f ()
         d.Upon(fun _ ->

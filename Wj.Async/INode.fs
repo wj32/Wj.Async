@@ -4,4 +4,4 @@
 type INode<'a> =
   inherit IDeferred<'a>
 
-  abstract member Link : parent:'a IDeferred -> unit
+  abstract member Link : parent : 'a IDeferred -> unit
