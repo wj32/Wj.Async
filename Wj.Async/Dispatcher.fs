@@ -6,7 +6,7 @@ open System.Threading;
 module Dispatcher =
   // IDispatcher functions
   let enqueue (t : IDispatcher) f = t.Enqueue(f)
-  let run (t : IDispatcher) d = t.Run(d)
+  let run (t : IDispatcher) f = t.Run(f)
 
   [<ReferenceEqualityAttribute>]
   type T =

@@ -2,5 +2,5 @@
 
 [<Interface>]
 type IDispatcher =
-  abstract member Enqueue : (unit -> unit) -> unit
-  abstract member Run : (unit -> 'a IDeferred) -> 'a
+  abstract member Enqueue : f:(unit -> unit) -> unit
+  abstract member Run : f:(unit -> 'a IDeferred) -> 'a
