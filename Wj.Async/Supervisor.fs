@@ -2,7 +2,7 @@
 
 open System
 
-exception SupervisorChildException of string list * exn
+exception SupervisorChildException of supervisorNames : string list * innerException : exn
 
 module Supervisor =
   let [<Literal>] private cannotAddHandlerToRoot =

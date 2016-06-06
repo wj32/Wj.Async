@@ -43,7 +43,7 @@ type DeferredBuilder() =
   member this.Using(disposable : #IDisposable, body) =
     Supervisor.tryFinally
       (fun () -> body disposable)
-      (fun () -> (if disposable <> null then disposable.Dispose()); Deferred.unit)
+      (fun () -> (match disposable with null -> () | _ -> disposable.Dispose()); Deferred.unit)
 
   member this.While(guard, body) =
     if guard () then

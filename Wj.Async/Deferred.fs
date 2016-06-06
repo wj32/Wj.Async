@@ -163,7 +163,7 @@ module Deferred =
       /// The node has a parent IDeferred.
       /// Due to FindRoot, the parent will always be an Unlinked or not a Node.T at all (but never a
       /// Linked).
-      | Linked of parent:'a IDeferred
+      | Linked of parent : 'a IDeferred
 
     [<ReferenceEqualityAttribute>]
     type 'a T =
@@ -232,6 +232,7 @@ module Deferred =
         member t.TryLink(parent) =
           match t.state with
           | Unlinked unlinked ->
+            // upon' parent does the same thing, but this should be slightly faster.
             let root = T<'a>.FindRoot(parent)
             unlinked.callbacks |> List.iter (upon' root)
             t.state <- Linked root
