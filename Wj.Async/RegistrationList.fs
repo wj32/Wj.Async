@@ -8,7 +8,7 @@ module RegistrationList =
     // Invariant: rest must be Initial or Singly. This ensures that register is amortized O(1).
     // This invariant exists only for performance reasons, and can be removed at any time.
     | Singly of value : 'a * rest : 'a State
-    | Doubly of 'a LinkedList
+    | Doubly of linkedList : 'a LinkedList
 
   type 'a T = {mutable state : 'a State}
 

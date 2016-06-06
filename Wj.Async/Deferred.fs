@@ -31,14 +31,9 @@ module Deferred =
 
   module private Var =
     [<ReferenceEquality>]
-    type 'a Pending =
-      { dispatcher : IDispatcher;
-        callbacks : 'a SupervisedCallback RegistrationList.T; }
-
-    [<ReferenceEquality>]
     type 'a State =
-      | Pending of 'a Pending
-      | Done of 'a
+      | Pending of dispatcher : IDispatcher * callbacks : 'a SupervisedCallback RegistrationList.T
+      | Done of value : 'a
 
     [<ReferenceEquality>]
     type 'a T =
@@ -49,19 +44,19 @@ module Deferred =
 
         member t.Upon((supervisor, f) as supervisedCallback) =
           match t.state with
-          | Pending pending -> RegistrationList.add pending.callbacks supervisedCallback
+          | Pending (_, callbacks) -> RegistrationList.add callbacks supervisedCallback
           | Done x -> enqueue supervisor f x
 
         member t.Register(f) = (t :> _ IDeferred).Register((ThreadShared.currentSupervisor (), f))
 
         member t.Register((supervisor, f) as supervisedCallback) =
           match t.state with
-          | Pending pending -> RegistrationList.register pending.callbacks supervisedCallback
+          | Pending (_, callbacks) -> RegistrationList.register callbacks supervisedCallback
           | Done x -> enqueue supervisor f x; Registration.empty
 
         member t.MoveFrom(from) =
           match t.state with
-          | Pending pending -> RegistrationList.moveFrom pending.callbacks from
+          | Pending (_, callbacks) -> RegistrationList.moveFrom callbacks from
           | Done x ->
             let dispatcher = ThreadShared.currentDispatcher ()
             RegistrationList.toList from |> List.iter (fun (supervisor, f) ->
@@ -90,18 +85,15 @@ module Deferred =
 
         member t.TrySet(x) =
           match t.state with
-          | Pending pending ->
+          | Pending (dispatcher, callbacks) ->
             t.state <- Done x
-            RegistrationList.toList pending.callbacks |> List.iter (fun (supervisor, f) ->
-              pending.dispatcher.Enqueue((supervisor, fun () -> f x))
+            RegistrationList.toList callbacks |> List.iter (fun (supervisor, f) ->
+              dispatcher.Enqueue((supervisor, fun () -> f x))
             )
             true
           | Done _ -> false
 
-    let createPending dispatcher =
-      { state = Pending
-          { dispatcher = ThreadShared.currentDispatcher ();
-            callbacks = RegistrationList.create () }; }
+    let createPending dispatcher = {state = Pending (dispatcher, RegistrationList.create ())}
 
     let createDone x = {state = Done x}
 
@@ -133,7 +125,7 @@ module Deferred =
     [<ReferenceEquality>]
     type 'a State =
       /// The node has no parent.
-      | Unlinked of 'a SupervisedCallback RegistrationList.T
+      | Unlinked of callbacks : 'a SupervisedCallback RegistrationList.T
       /// The node has a parent IDeferred.
       /// Due to FindRoot, the parent will always be an Unlinked or not a Node.T at all (but never a
       /// Linked).
