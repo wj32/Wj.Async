@@ -41,7 +41,7 @@ module Supervisor =
               | SupervisorChildException (supervisorNames, _) ->
                 SupervisorChildException (t.name :: supervisorNames, ex)
               | ex ->
-                SupervisorChildException ([], ex)
+                SupervisorChildException ([t.name], ex)
             parent.Raise(ex')
           | None -> ()
 
