@@ -211,7 +211,7 @@ module Deferred =
 
         member t.TryGet() =
           match t.state with
-          | Unlinked _ -> invalidOp DeferredNotDetermined
+          | Unlinked _ -> None
           | Linked parent -> tryGet (T<'a>.FindRoot(parent))
 
         member t.IsDetermined =
