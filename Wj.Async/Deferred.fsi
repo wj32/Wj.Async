@@ -9,9 +9,9 @@ module Deferred =
   val register : 'a IDeferred -> callback : ('a -> unit) -> IRegistration
   val register' : 'a IDeferred -> supervisedCallback : 'a SupervisedCallback -> IRegistration
   val moveFrom : 'a IDeferred -> from : 'a SupervisedCallback RegistrationList.T -> unit
+  val isDetermined : 'a IDeferred -> bool
   val get : 'a IDeferred -> 'a
   val tryGet : 'a IDeferred -> 'a option
-  val isDetermined : 'a IDeferred -> bool
   // IVar functions
   val set : 'a IVar -> value : 'a -> unit
   val trySet : 'a IVar -> value : 'a -> bool

@@ -14,9 +14,9 @@ module Deferred =
   let register (t : _ IDeferred) (f : _ -> unit) = t.Register(f)
   let register' (t : _ IDeferred) (supervisedCallback : _ SupervisedCallback) = t.Register(supervisedCallback)
   let moveFrom (t : _ IDeferred) from = t.MoveFrom(from)
+  let isDetermined (t : _ IDeferred) = t.IsDetermined
   let get (t : _ IDeferred) = t.Get()
   let tryGet (t : _ IDeferred) = t.TryGet()
-  let isDetermined (t : _ IDeferred) = t.IsDetermined
   // IVar functions
   let set (t : _ IVar) x = t.Set(x)
   let trySet (t : _ IVar) x = t.TrySet(x)
@@ -68,6 +68,11 @@ module Deferred =
               dispatcher.Enqueue((supervisor, fun () -> f x))
             )
 
+        member t.IsDetermined =
+          match t.state with
+          | Pending _ -> false
+          | Done _ -> true
+
         member t.Get() =
           match t.state with
           | Pending _ -> invalidOp DeferredNotDetermined
@@ -77,11 +82,6 @@ module Deferred =
           match t.state with
           | Pending _ -> None
           | Done x -> Some x
-
-        member t.IsDetermined =
-          match t.state with
-          | Pending _ -> false
-          | Done _ -> true
 
       interface 'a IVar with
         member t.Set(x) =
@@ -121,11 +121,11 @@ module Deferred =
 
         member t.MoveFrom(from) = RegistrationList.clear from
 
+        member t.IsDetermined = false
+
         member t.Get() = invalidOp DeferredNotDetermined
 
         member t.TryGet() = None
-
-        member t.IsDetermined = false
 
     let create () = Never
 
@@ -190,6 +190,11 @@ module Deferred =
           | Unlinked callbacks -> RegistrationList.moveFrom callbacks from
           | Linked parent -> moveFrom (T<'a>.FindRoot(parent)) from
 
+        member t.IsDetermined =
+          match t.state with
+          | Unlinked _ -> false
+          | Linked parent -> isDetermined (T<'a>.FindRoot(parent))
+
         member t.Get() =
           match t.state with
           | Unlinked _ -> invalidOp DeferredNotDetermined
@@ -199,11 +204,6 @@ module Deferred =
           match t.state with
           | Unlinked _ -> None
           | Linked parent -> tryGet (T<'a>.FindRoot(parent))
-
-        member t.IsDetermined =
-          match t.state with
-          | Unlinked _ -> false
-          | Linked parent -> isDetermined (T<'a>.FindRoot(parent))
 
       interface 'a INode with
         member t.IsLinked =

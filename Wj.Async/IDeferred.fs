@@ -7,6 +7,6 @@ type 'a IDeferred =
   abstract member Register : callback : ('a -> unit) -> IRegistration
   abstract member Register : supervisedCallback : 'a SupervisedCallback -> IRegistration
   abstract member MoveFrom : from : 'a SupervisedCallback RegistrationList.T -> unit
+  abstract member IsDetermined : bool
   abstract member Get : unit -> 'a
   abstract member TryGet : unit -> 'a option
-  abstract member IsDetermined : bool
