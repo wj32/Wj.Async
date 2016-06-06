@@ -9,7 +9,7 @@ module Supervisor =
   val parent : ISupervisor -> ISupervisor option
   val name : ISupervisor -> string
   val detach : ISupervisor -> unit
-  val raise : ISupervisor -> ex : exn -> unit
+  val sendException : ISupervisor -> ex : exn -> unit
   val uponException : ISupervisor -> handler : (exn -> unit) -> unit
   val uponException' : ISupervisor -> supervisedHandler : exn SupervisedCallback -> unit
   val run : ISupervisor -> f : (unit -> 'a) -> Result.T<'a, exn>

@@ -8,13 +8,11 @@ module Supervisor =
   let [<Literal>] private cannotAddHandlerToRoot =
     "Handlers cannot be registered on the root supervisor."
 
-  let systemRaise = raise
-
   // ISupervisor functions
   let parent (t : ISupervisor) = t.Parent
   let name (t : ISupervisor) = t.Name
-  let raise (t : ISupervisor) ex = t.Raise(ex)
   let detach (t : ISupervisor) = t.Detach()
+  let sendException (t : ISupervisor) ex = t.SendException(ex)
   let uponException (t : ISupervisor) (handler : exn -> unit) = t.UponException(handler)
   let uponException' (t : ISupervisor) (supervisedHandler : exn SupervisedCallback) =
     t.UponException(supervisedHandler)
@@ -31,7 +29,7 @@ module Supervisor =
 
         member t.Name = t.name
 
-        member t.Raise(ex) =
+        member t.SendException(ex) =
           t.handlers |> List.iter (fun (supervisor, handler) ->
             supervisor.Run(fun () -> handler ex) |> ignore
           )
@@ -43,7 +41,7 @@ module Supervisor =
                 SupervisorChildException (t.name :: supervisorNames, ex)
               | ex ->
                 SupervisorChildException ([t.name], ex)
-            parent.Raise(ex')
+            parent.SendException(ex')
           | None -> ()
 
         member t.Detach() = t.parent <- None
@@ -59,7 +57,7 @@ module Supervisor =
           let result = Result.tryWith f
           ThreadShared.popSupervisor t
           match result with
-          | Result.Failure ex -> (t :> ISupervisor).Raise(ex)
+          | Result.Failure ex -> (t :> ISupervisor).SendException(ex)
           | Result.Success _ -> ()
           result
 
@@ -78,7 +76,7 @@ module Supervisor =
 
         member t.Name = "Root"
 
-        member t.Raise(ex) = systemRaise ex
+        member t.SendException(ex) = raise ex
 
         member t.Detach() = ()
 
@@ -109,36 +107,43 @@ module Supervisor =
   module AfterDetermined =
     type T = Raise | Log | Ignore
 
-  let raiseAfterDetermined afterDetermined ex =
+  let handleAfterDetermined afterDetermined ex =
     match afterDetermined with
-    | AfterDetermined.Raise -> systemRaise ex
+    | AfterDetermined.Raise -> raise ex
     | AfterDetermined.Log -> stderr.WriteLine(sprintf "Unhandled exception after tryWith:\n%s" (string ex))
     | AfterDetermined.Ignore -> ()
 
   let tryWith' name (f : unit -> _ IDeferred) (handler : exn -> _ IDeferred) afterDetermined =
-    let reader = Deferred.createNode ()
-    let mutable writer = Some reader
     let t = createNamed name
     detach t
-    uponException t (fun ex ->
-      match writer with
-      | Some v ->
-        Deferred.link v (handler ex)
-        writer <- None
-      | None -> raiseAfterDetermined afterDetermined ex
-    )
+    let startHandlingAfterDetermined () =
+      uponException t (fun ex -> handleAfterDetermined afterDetermined ex)
     let result = run t f
     match result with
     | Result.Success d ->
-      Deferred.upon' d (root, (fun x ->
-        match writer with
-        | Some v ->
+      if Deferred.isDetermined d then
+        startHandlingAfterDetermined ()
+        d
+      else
+        let reader = Deferred.createNode ()
+        let mutable writer = Some reader
+        let write v d =
           Deferred.link v d
           writer <- None
-        | None -> ()
-      ))
-    | Result.Failure _ -> ()
-    reader :> _ IDeferred
+        uponException t (fun ex ->
+          match writer with
+          | Some v -> write v (handler ex)
+          | None -> handleAfterDetermined afterDetermined ex
+        )
+        Deferred.upon' d (root, (fun x ->
+          match writer with
+          | Some v -> write v d
+          | None -> ()
+        ))
+        reader :> _ IDeferred
+    | Result.Failure ex ->
+      startHandlingAfterDetermined ()
+      handler ex
 
   let tryWith f handler afterDetermined =
     tryWith' "Supervisor.tryWith" f handler afterDetermined
@@ -154,6 +159,6 @@ module Supervisor =
       Deferred.map (finalizer ()) (fun () ->
         match result with
         | Result.Success x -> x
-        | Result.Failure ex -> systemRaise ex
+        | Result.Failure ex -> raise ex
       )
     )
