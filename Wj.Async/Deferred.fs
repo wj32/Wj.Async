@@ -288,17 +288,23 @@ module Deferred =
 
   let allUnit ts = allForget ts
 
-  let any (ts : _ IDeferred list) =
+  let anyiMap (ts : _ IDeferred list) f =
     let v = createVar ()
-    ts |> List.iter (fun t -> upon t (trySet v >> ignore))
+    let mutable registrations = []
+    registrations <- ts |> List.mapi (fun i t ->
+      register t (fun x ->
+        if not v.IsDetermined then
+          set v (f i x)
+          registrations |> List.iter Registration.remove
+      )
+    )
     v :> _ IDeferred
 
-  let anyi (ts : _ IDeferred list) =
-    let v = createVar ()
-    ts |> List.iteri (fun i t -> upon t (fun x -> trySet v (x, i) |> ignore))
-    v :> _ IDeferred
+  let any (ts : _ IDeferred list) = anyiMap ts (fun i x -> x)
 
-  let anyUnit (ts : _ IDeferred list) = map (any ts) ignore
+  let anyi (ts : _ IDeferred list) = anyiMap ts (fun i x -> (x, i))
+
+  let anyUnit (ts : _ IDeferred list) = anyiMap ts (fun i x -> ())
 
   let dontWaitFor (t : unit IDeferred) = ()
 
