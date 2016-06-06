@@ -5,6 +5,8 @@ open System.Collections.Generic
 module RegistrationList =
   type 'a State =
     | Initial
+    // Invariant: rest must be Initial or Singly. This ensures that register is amortized O(1).
+    // This invariant exists only for performance reasons, and can be removed at any time.
     | Singly of value : 'a * rest : 'a State
     | Doubly of 'a LinkedList
 
@@ -53,18 +55,23 @@ module RegistrationList =
       t.state <- Doubly linkedList
       linkedList
 
-  let add t (x : 'a) = t.state <- Singly (x, t.state)
+  let add t (x : 'a) =
+    match t.state with
+    | Doubly linkedList -> linkedList.AddFirst(x) |> ignore
+    | _ -> t.state <- Singly (x, t.state)
 
   let register t (x : 'a) =
     let linkedList = ensureDoubly t
     Registration.fromLinkedListNode (linkedList.AddFirst(x))
 
   let moveFrom t from =
-    match t.state with
-    | Initial as initial ->
+    let swap () =
+      let temp = t.state
       t.state <- from.state
-      from.state <- initial
-    | _ ->
+      from.state <- t.state
+    match t.state with
+    | Initial -> swap ()
+    | Singly _ ->
       let finishMoveSingly reversed replacement =
         let rec reverseIntoSingly acc xs =
           match xs with
@@ -85,6 +92,10 @@ module RegistrationList =
             let linkedList = ensureDoubly t
             moveToStartOfLinkedListFromState linkedList from.state
       attemptMoveSingly [] from.state
+    | Doubly toLinkedList ->
+      match toLinkedList.First with
+      | null -> swap ()
+      | _ -> moveToStartOfLinkedListFromState toLinkedList from.state
 
   let clear t = t.state <- Initial
 
