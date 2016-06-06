@@ -11,6 +11,9 @@ module Deferred =
   // IDeferred functions
   let upon (t : _ IDeferred) (f : _ -> unit) = t.Upon(f)
   let upon' (t : _ IDeferred) (supervisedCallback : _ SupervisedCallback) = t.Upon(supervisedCallback)
+  let register (t : _ IDeferred) (f : _ -> unit) = t.Register(f)
+  let register' (t : _ IDeferred) (supervisedCallback : _ SupervisedCallback) = t.Register(supervisedCallback)
+  let moveFrom (t : _ IDeferred) from = t.MoveFrom(from)
   let get (t : _ IDeferred) = t.Get()
   let tryGet (t : _ IDeferred) = t.TryGet()
   let isDetermined (t : _ IDeferred) = t.IsDetermined
@@ -22,30 +25,48 @@ module Deferred =
   let link (t : _ INode) d = t.Link(d)
   let tryLink (t : _ INode) d = t.TryLink(d)
 
+  let enqueue supervisor f x =
+    let dispatcher = ThreadShared.currentDispatcher ()
+    dispatcher.Enqueue((supervisor, fun () -> f x))
+
   module private Var =
-    [<ReferenceEqualityAttribute>]
+    [<ReferenceEquality>]
     type 'a Pending =
       { dispatcher : IDispatcher;
-        mutable callbacks : 'a SupervisedCallback list; }
+        callbacks : 'a SupervisedCallback RegistrationList.T; }
 
-    [<ReferenceEqualityAttribute>]
+    [<ReferenceEquality>]
     type 'a State =
       | Pending of 'a Pending
       | Done of 'a
 
-    [<ReferenceEqualityAttribute>]
+    [<ReferenceEquality>]
     type 'a T =
-      { mutable state : 'a State; }
+      {mutable state : 'a State}
 
       interface 'a IDeferred with
         member t.Upon(f) = (t :> _ IDeferred).Upon((ThreadShared.currentSupervisor (), f))
 
         member t.Upon((supervisor, f) as supervisedCallback) =
           match t.state with
-          | Pending pending -> pending.callbacks <- supervisedCallback :: pending.callbacks
+          | Pending pending -> RegistrationList.add pending.callbacks supervisedCallback
+          | Done x -> enqueue supervisor f x
+
+        member t.Register(f) = (t :> _ IDeferred).Register((ThreadShared.currentSupervisor (), f))
+
+        member t.Register((supervisor, f) as supervisedCallback) =
+          match t.state with
+          | Pending pending -> RegistrationList.register pending.callbacks supervisedCallback
+          | Done x -> enqueue supervisor f x; Registration.empty
+
+        member t.MoveFrom(from) =
+          match t.state with
+          | Pending pending -> RegistrationList.moveFrom pending.callbacks from
           | Done x ->
             let dispatcher = ThreadShared.currentDispatcher ()
-            dispatcher.Enqueue((supervisor, fun () -> f x))
+            RegistrationList.toList from |> List.iter (fun (supervisor, f) ->
+              dispatcher.Enqueue((supervisor, fun () -> f x))
+            )
 
         member t.Get() =
           match t.state with
@@ -71,9 +92,8 @@ module Deferred =
           match t.state with
           | Pending pending ->
             t.state <- Done x
-            let callbacks = List.rev pending.callbacks
-            callbacks |> List.iter (fun (supervisor, f) ->
-              pending.dispatcher.Enqueue(supervisor, fun () -> f x)
+            RegistrationList.toList pending.callbacks |> List.iter (fun (supervisor, f) ->
+              pending.dispatcher.Enqueue((supervisor, fun () -> f x))
             )
             true
           | Done _ -> false
@@ -81,12 +101,12 @@ module Deferred =
     let createPending dispatcher =
       { state = Pending
           { dispatcher = ThreadShared.currentDispatcher ();
-            callbacks = []; }; }
+            callbacks = RegistrationList.create () }; }
 
-    let createDone x = { state = Done x; }
+    let createDone x = {state = Done x}
 
   module private Never =
-    [<ReferenceEqualityAttribute>]
+    [<ReferenceEquality>]
     type 'a T =
       | Never
 
@@ -94,6 +114,12 @@ module Deferred =
         member t.Upon(f : 'a -> unit) = ()
 
         member t.Upon(supervisedCallback : 'a SupervisedCallback) = ()
+
+        member t.Register(f : 'a -> unit) = Registration.empty
+
+        member t.Register(supervisedCallback : 'a SupervisedCallback) = Registration.empty
+
+        member t.MoveFrom(from) = RegistrationList.clear from
 
         member t.Get() = invalidOp DeferredNotDetermined
 
@@ -104,20 +130,16 @@ module Deferred =
     let create () = Never
 
   module private Node =
-    [<ReferenceEqualityAttribute>]
-    type 'a Unlinked =
-      { mutable callbacks : 'a SupervisedCallback list; }
-
-    [<ReferenceEqualityAttribute>]
+    [<ReferenceEquality>]
     type 'a State =
       /// The node has no parent.
-      | Unlinked of 'a Unlinked
+      | Unlinked of 'a SupervisedCallback RegistrationList.T
       /// The node has a parent IDeferred.
       /// Due to FindRoot, the parent will always be an Unlinked or not a Node.T at all (but never a
       /// Linked).
       | Linked of parent : 'a IDeferred
 
-    [<ReferenceEqualityAttribute>]
+    [<ReferenceEquality>]
     type 'a T =
       { mutable state : 'a State; }
 
@@ -153,8 +175,20 @@ module Deferred =
 
         member t.Upon(supervisedCallback) =
           match t.state with
-          | Unlinked unlinked -> unlinked.callbacks <- supervisedCallback :: unlinked.callbacks
+          | Unlinked callbacks -> RegistrationList.add callbacks supervisedCallback
           | Linked parent -> upon' (T<'a>.FindRoot(parent)) supervisedCallback
+
+        member t.Register(f) = (t :> _ IDeferred).Register((ThreadShared.currentSupervisor (), f))
+
+        member t.Register(supervisedCallback) =
+          match t.state with
+          | Unlinked callbacks -> RegistrationList.register callbacks supervisedCallback
+          | Linked parent -> register' (T<'a>.FindRoot(parent)) supervisedCallback
+
+        member t.MoveFrom(from) =
+          match t.state with
+          | Unlinked callbacks -> RegistrationList.moveFrom callbacks from
+          | Linked parent -> moveFrom (T<'a>.FindRoot(parent)) from
 
         member t.Get() =
           match t.state with
@@ -183,17 +217,15 @@ module Deferred =
 
         member t.TryLink(parent) =
           match t.state with
-          | Unlinked unlinked ->
-            // upon' parent does the same thing, but this should be slightly faster.
+          | Unlinked callbacks ->
+            // moveFrom parent callbacks does the same thing, but this should be slightly faster.
             let root = T<'a>.FindRoot(parent)
-            unlinked.callbacks |> List.iter (upon' root)
+            moveFrom root callbacks
             t.state <- Linked root
             true
           | Linked _ -> false
 
-    let create () =
-      { state = Unlinked
-          { callbacks = []; }; }
+    let create () = {state = Unlinked (RegistrationList.create ())}
 
   let create x = Var.createDone x :> _ IDeferred
 

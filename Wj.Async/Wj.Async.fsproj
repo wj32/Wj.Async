@@ -46,6 +46,11 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Result.fsi" />
     <Compile Include="Result.fs" />
+    <Compile Include="IRegistration.fs" />
+    <Compile Include="Registration.fsi" />
+    <Compile Include="Registration.fs" />
+    <Compile Include="RegistrationList.fsi" />
+    <Compile Include="RegistrationList.fs" />
     <Compile Include="ISupervisor.fs" />
     <Compile Include="IDeferred.fs" />
     <Compile Include="IVar.fs" />

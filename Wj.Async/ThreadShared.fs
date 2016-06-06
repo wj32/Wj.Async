@@ -3,7 +3,7 @@
 open System.Threading;
 
 module internal ThreadShared =
-  [<ReferenceEqualityAttribute>]
+  [<ReferenceEquality>]
   type ThreadBlock =
     { mutable supervisors : ISupervisor list;
       mutable dispatchers : IDispatcher list; }

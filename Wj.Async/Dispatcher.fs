@@ -8,7 +8,7 @@ module Dispatcher =
   let enqueue (t : IDispatcher) supervisedCallback = t.Enqueue(supervisedCallback)
   let run (t : IDispatcher) f = t.Run(f)
 
-  [<ReferenceEqualityAttribute>]
+  [<ReferenceEquality>]
   type T =
     { queue : unit SupervisedCallback Queue;
       queueLock : obj; }

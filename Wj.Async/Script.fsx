@@ -2,6 +2,9 @@
 // for more guidance on F# programming.
 
 #load "Result.fs"
+#load "IRegistration.fs"
+#load "Registration.fs"
+#load "RegistrationList.fs"
 #load "ISupervisor.fs"
 #load "IDeferred.fs"
 #load "IVar.fs"

@@ -6,6 +6,9 @@ module Deferred =
   // IDeferred functions
   val upon : 'a IDeferred -> callback : ('a -> unit) -> unit
   val upon' : 'a IDeferred -> supervisedCallback : 'a SupervisedCallback -> unit
+  val register : 'a IDeferred -> callback : ('a -> unit) -> IRegistration
+  val register' : 'a IDeferred -> supervisedCallback : 'a SupervisedCallback -> IRegistration
+  val moveFrom : 'a IDeferred -> from : 'a SupervisedCallback RegistrationList.T -> unit
   val get : 'a IDeferred -> 'a
   val tryGet : 'a IDeferred -> 'a option
   val isDetermined : 'a IDeferred -> bool
