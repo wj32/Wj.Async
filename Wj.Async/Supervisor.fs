@@ -127,13 +127,13 @@ module Supervisor =
     let result = run t f
     match result with
     | Result.Success d ->
-      Deferred.upon d (fun x ->
+      Deferred.upon' d (root, (fun x ->
         match writer with
         | Some v ->
           Deferred.link v d
           writer <- None
         | None -> ()
-      )
+      ))
     | Result.Failure _ -> ()
     reader :> _ IDeferred
 
