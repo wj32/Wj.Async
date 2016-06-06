@@ -5,7 +5,7 @@ open System.Threading;
 
 module Dispatcher =
   // IDispatcher functions
-  let enqueue (t : IDispatcher) supervisor f = t.Enqueue(supervisor, f)
+  let enqueue (t : IDispatcher) supervisedCallback = t.Enqueue(supervisedCallback)
   let run (t : IDispatcher) f = t.Run(f)
 
   [<ReferenceEqualityAttribute>]
