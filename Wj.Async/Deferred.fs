@@ -281,14 +281,15 @@ module Deferred =
   let allUnit ts = allForget ts
 
   let anyiMap (ts : _ IDeferred list) f =
+    let dispatcher = ThreadShared.currentDispatcher ()
     let v = createVar ()
     let mutable registrations = []
     registrations <- ts |> List.mapi (fun i t ->
-      register t (fun x ->
+      register' t (dispatcher.RootSupervisor, (fun x ->
         if not v.IsDetermined then
           set v (f i x)
           registrations |> List.iter Registration.remove
-      )
+      ))
     )
     v :> _ IDeferred
 

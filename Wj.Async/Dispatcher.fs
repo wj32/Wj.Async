@@ -7,6 +7,7 @@ module Dispatcher =
   // IDispatcher functions
   let enqueue (t : IDispatcher) supervisedCallback = t.Enqueue(supervisedCallback)
   let run (t : IDispatcher) f = t.Run(f)
+  let rootSupervisor (t : IDispatcher) = t.RootSupervisor
 
   [<ReferenceEquality>]
   type T =
@@ -51,6 +52,8 @@ module Dispatcher =
           result
         finally
           ThreadShared.popSupervisor supervisor
+
+      member t.RootSupervisor = Supervisor.root
 
   let current () = ThreadShared.currentDispatcher ()
 
