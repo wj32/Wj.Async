@@ -113,8 +113,8 @@ module Supervisor =
     | AfterDetermined.Ignore -> ()
 
   let tryWith' name (f : unit -> _ IDeferred) (handler : exn -> _ IDeferred) afterDetermined =
-    let v = Deferred.createNode ()
-    let mutable writer = Some v
+    let reader = Deferred.createNode ()
+    let mutable writer = Some reader
     let t = createNamed name
     detach t
     uponException t (fun ex ->
@@ -135,7 +135,7 @@ module Supervisor =
         | None -> ()
       )
     | Result.Failure _ -> ()
-    v :> _ IDeferred
+    reader :> _ IDeferred
 
   let tryWith f handler afterDetermined =
     tryWith' "Supervisor.tryWith" f handler afterDetermined
