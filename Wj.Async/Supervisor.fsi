@@ -2,6 +2,8 @@
 
 open System
 
+exception SupervisorChildException of supervisorNames : string list * innerException : exn
+
 module Supervisor =
   // ISupervisor functions
   val parent : ISupervisor -> ISupervisor option
@@ -9,7 +11,7 @@ module Supervisor =
   val detach : ISupervisor -> unit
   val raise : ISupervisor -> ex : exn -> unit
   val uponException : ISupervisor -> handler : (exn -> unit) -> unit
-  val uponException' : ISupervisor -> supervisor : ISupervisor * handler : (exn -> unit) -> unit
+  val uponException' : ISupervisor -> supervisedHandler : exn SupervisedCallback -> unit
   val run : ISupervisor -> f : (unit -> 'a) -> Result.T<'a, exn>
 
   val root : ISupervisor

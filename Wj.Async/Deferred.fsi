@@ -5,7 +5,7 @@ open System.Threading.Tasks;
 module Deferred =
   // IDeferred functions
   val upon : 'a IDeferred -> callback : ('a -> unit) -> unit
-  val upon' : 'a IDeferred -> supervisor : ISupervisor * callback : ('a -> unit) -> unit
+  val upon' : 'a IDeferred -> supervisedCallback : 'a SupervisedCallback -> unit
   val get : 'a IDeferred -> 'a
   val tryGet : 'a IDeferred -> 'a option
   val isDetermined : 'a IDeferred -> bool

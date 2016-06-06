@@ -10,13 +10,13 @@ module Dispatcher =
 
   [<ReferenceEqualityAttribute>]
   type T =
-    { queue : (ISupervisor * (unit -> unit)) Queue;
+    { queue : unit SupervisedCallback Queue;
       queueLock : obj; }
 
     interface IDispatcher with
-      member t.Enqueue(supervisor, f) =
+      member t.Enqueue(supervisedCallback) =
         lock t.queueLock (fun () ->
-          t.queue.Enqueue((supervisor, f))
+          t.queue.Enqueue(supervisedCallback)
           Monitor.Pulse(t.queueLock)
         )
 

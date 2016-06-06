@@ -9,8 +9,8 @@ module Deferred =
   let [<Literal>] private NodeAlreadyLinked = "The node has already been joined."
 
   // IDeferred functions
-  let upon (t : _ IDeferred) f = t.Upon(f)
-  let upon' (t : _ IDeferred) (supervisor, f) = t.Upon(supervisor, f)
+  let upon (t : _ IDeferred) (f : _ -> unit) = t.Upon(f)
+  let upon' (t : _ IDeferred) (supervisedCallback : _ SupervisedCallback) = t.Upon(supervisedCallback)
   let get (t : _ IDeferred) = t.Get()
   let tryGet (t : _ IDeferred) = t.TryGet()
   let isDetermined (t : _ IDeferred) = t.IsDetermined
@@ -26,7 +26,7 @@ module Deferred =
     [<ReferenceEqualityAttribute>]
     type 'a Pending =
       { dispatcher : IDispatcher;
-        mutable callbacks : (ISupervisor * ('a -> unit)) list; }
+        mutable callbacks : 'a SupervisedCallback list; }
 
     [<ReferenceEqualityAttribute>]
     type 'a State =
@@ -38,14 +38,14 @@ module Deferred =
       { mutable state : 'a State; }
 
       interface 'a IDeferred with
-        member t.Upon(f) = (t :> _ IDeferred).Upon(ThreadShared.currentSupervisor (), f)
+        member t.Upon(f) = (t :> _ IDeferred).Upon((ThreadShared.currentSupervisor (), f))
 
-        member t.Upon(supervisor, f) =
+        member t.Upon((supervisor, f) as supervisedCallback) =
           match t.state with
-          | Pending pending -> pending.callbacks <- (supervisor, f) :: pending.callbacks
+          | Pending pending -> pending.callbacks <- supervisedCallback :: pending.callbacks
           | Done x ->
             let dispatcher = ThreadShared.currentDispatcher ()
-            dispatcher.Enqueue(supervisor, fun () -> f x)
+            dispatcher.Enqueue((supervisor, fun () -> f x))
 
         member t.Get() =
           match t.state with
@@ -91,9 +91,9 @@ module Deferred =
       | Never
 
       interface 'a IDeferred with
-        member t.Upon(f) = ()
+        member t.Upon(f : 'a -> unit) = ()
 
-        member t.Upon(supervisor, f) = ()
+        member t.Upon(supervisedCallback : 'a SupervisedCallback) = ()
 
         member t.Get() = invalidOp DeferredNotDetermined
 
@@ -114,9 +114,9 @@ module Deferred =
       { mutable state : State<'a, 'b>; }
 
       interface 'b IDeferred with
-        member t.Upon(f) = (t :> _ IDeferred).Upon(ThreadShared.currentSupervisor (), f)
+        member t.Upon(f) = (t :> _ IDeferred).Upon((ThreadShared.currentSupervisor (), f))
 
-        member t.Upon(supervisor, f) =
+        member t.Upon((supervisor, f)) =
           let dispatcher = ThreadShared.currentDispatcher ()
           match t.state with
           | Pending (parent, mappingSupervisor, mapping) ->
@@ -154,7 +154,7 @@ module Deferred =
   module private Node =
     [<ReferenceEqualityAttribute>]
     type 'a Unlinked =
-      { mutable callbacks : (ISupervisor * ('a -> unit)) list; }
+      { mutable callbacks : 'a SupervisedCallback list; }
 
     [<ReferenceEqualityAttribute>]
     type 'a State =
@@ -197,12 +197,12 @@ module Deferred =
         | _ -> d
 
       interface 'a IDeferred with
-        member t.Upon(f) = (t :> _ IDeferred).Upon(ThreadShared.currentSupervisor (), f)
+        member t.Upon(f) = (t :> _ IDeferred).Upon((ThreadShared.currentSupervisor (), f))
 
-        member t.Upon(supervisor, f) =
+        member t.Upon(supervisedCallback) =
           match t.state with
-          | Unlinked unlinked -> unlinked.callbacks <- (supervisor, f) :: unlinked.callbacks
-          | Linked parent -> upon' (T<'a>.FindRoot(parent)) (supervisor, f)
+          | Unlinked unlinked -> unlinked.callbacks <- supervisedCallback :: unlinked.callbacks
+          | Linked parent -> upon' (T<'a>.FindRoot(parent)) supervisedCallback
 
         member t.Get() =
           match t.state with

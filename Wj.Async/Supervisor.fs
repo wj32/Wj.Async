@@ -15,15 +15,16 @@ module Supervisor =
   let name (t : ISupervisor) = t.Name
   let raise (t : ISupervisor) ex = t.Raise(ex)
   let detach (t : ISupervisor) = t.Detach()
-  let uponException (t : ISupervisor) handler = t.UponException(handler)
-  let uponException' (t : ISupervisor) (supervisor, handler) = t.UponException(supervisor, handler)
+  let uponException (t : ISupervisor) (handler : exn -> unit) = t.UponException(handler)
+  let uponException' (t : ISupervisor) (supervisedHandler : exn SupervisedCallback) =
+    t.UponException(supervisedHandler)
   let run (t : ISupervisor) f = t.Run(f)
 
   module Child =
     type T =
       { name : string;
         mutable parent : ISupervisor option;
-        mutable handlers : (ISupervisor * (exn -> unit)) list; }
+        mutable handlers : exn SupervisedCallback list; }
 
       interface ISupervisor with
         member t.Parent = t.parent
@@ -48,10 +49,10 @@ module Supervisor =
         member t.Detach() = t.parent <- None
 
         member t.UponException(handler) =
-          (t :> ISupervisor).UponException(ThreadShared.currentSupervisor (), handler)
+          (t :> ISupervisor).UponException((ThreadShared.currentSupervisor (), handler))
 
-        member t.UponException(supervisor, handler) =
-          t.handlers <- (supervisor, handler) :: t.handlers
+        member t.UponException(supervisedHandler) =
+          t.handlers <- supervisedHandler :: t.handlers
 
         member t.Run(f) =
           ThreadShared.pushSupervisor t
@@ -81,9 +82,11 @@ module Supervisor =
 
         member t.Detach() = ()
 
-        member t.UponException(handler) = invalidOp cannotAddHandlerToRoot
+        member t.UponException(handler : exn -> unit) : unit =
+          invalidOp cannotAddHandlerToRoot
 
-        member t.UponException(supervisor, handler) = invalidOp cannotAddHandlerToRoot
+        member t.UponException(supervisedHandler : exn SupervisedCallback) : unit =
+          invalidOp cannotAddHandlerToRoot
 
         member t.Run(f) = Result.tryWith f
 
