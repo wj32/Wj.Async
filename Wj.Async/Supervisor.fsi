@@ -7,10 +7,10 @@ module Supervisor =
   val parent : ISupervisor -> ISupervisor option
   val name : ISupervisor -> string
   val detach : ISupervisor -> unit
-  val raise : ISupervisor -> ex : Exception -> unit
-  val uponException : ISupervisor -> handler : (Exception -> unit) -> unit
-  val uponException' : ISupervisor -> supervisor : ISupervisor * handler : (Exception -> unit) -> unit
-  val run : ISupervisor -> f : (unit -> unit) -> unit
+  val raise : ISupervisor -> ex : exn -> unit
+  val uponException : ISupervisor -> handler : (exn -> unit) -> unit
+  val uponException' : ISupervisor -> supervisor : ISupervisor * handler : (exn -> unit) -> unit
+  val run : ISupervisor -> f : (unit -> 'a) -> Result.T<'a, exn>
 
   val root : ISupervisor
   val current : unit -> ISupervisor
@@ -19,7 +19,7 @@ module Supervisor =
 
   val supervise
     : f : (unit -> 'a IDeferred)
-    -> observer : (Exception -> unit)
+    -> observer : (exn -> unit)
     -> 'a IDeferred
 
   module AfterDetermined =
@@ -27,7 +27,7 @@ module Supervisor =
 
   val tryWith
     : f : (unit -> 'a IDeferred)
-    -> handler : (Exception -> 'a IDeferred)
+    -> handler : (exn -> 'a IDeferred)
     -> afterDetermined : AfterDetermined.T
     -> 'a IDeferred
 

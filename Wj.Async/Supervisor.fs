@@ -2,7 +2,7 @@
 
 open System
 
-exception SupervisorChildException of string list * Exception
+exception SupervisorChildException of string list * exn
 
 module Supervisor =
   let [<Literal>] private cannotAddHandlerToRoot =
@@ -23,7 +23,7 @@ module Supervisor =
     type T =
       { name : string;
         mutable parent : ISupervisor option;
-        mutable handlers : (ISupervisor * (Exception -> unit)) list; }
+        mutable handlers : (ISupervisor * (exn -> unit)) list; }
 
       interface ISupervisor with
         member t.Parent = t.parent
@@ -31,7 +31,9 @@ module Supervisor =
         member t.Name = t.name
 
         member t.Raise(ex) =
-          t.handlers |> List.iter (fun (supervisor, handler) -> supervisor.Run(fun () -> handler ex))
+          t.handlers |> List.iter (fun (supervisor, handler) ->
+            supervisor.Run(fun () -> handler ex) |> ignore
+          )
           match t.parent with
           | Some parent ->
             let ex' =
@@ -53,15 +55,12 @@ module Supervisor =
 
         member t.Run(f) =
           ThreadShared.pushSupervisor t
-          let mutable poppedSupervisor = false
-          try
-            f ()
-          with ex ->
-            ThreadShared.popSupervisor t
-            poppedSupervisor <- true
-            (t :> ISupervisor).Raise(ex)
-          if not poppedSupervisor then
-            ThreadShared.popSupervisor t
+          let result = Result.tryWith f
+          ThreadShared.popSupervisor t
+          match result with
+          | Result.Failure ex -> (t :> ISupervisor).Raise(ex)
+          | Result.Success _ -> ()
+          result
 
     let create name =
       { name = name;
@@ -86,7 +85,7 @@ module Supervisor =
 
         member t.UponException(supervisor, handler) = invalidOp cannotAddHandlerToRoot
 
-        member t.Run(f) = f ()
+        member t.Run(f) = Result.tryWith f
 
   let root = Root.Root :> ISupervisor
 
@@ -97,16 +96,15 @@ module Supervisor =
   let createNamed name = Child.create name
 
   let supervise (f : unit -> _ IDeferred) observer =
-    let v = Deferred.createNode ()
     let t = createNamed "Supervisor.supervise"
     uponException t observer
-    run t (fun () -> Deferred.link v (f ()))
-    v :> _ IDeferred
+    let result = run t f
+    match result with
+    | Result.Success d -> d
+    | Result.Failure _ -> Deferred.never ()
 
   module AfterDetermined =
     type T = Raise | Log | Ignore
-
-    let dontRaise t = if t = Raise then Log else t
 
   let raiseAfterDetermined afterDetermined ex =
     match afterDetermined with
@@ -114,48 +112,42 @@ module Supervisor =
     | AfterDetermined.Log -> stderr.WriteLine(sprintf "Unhandled exception after tryWith:\n%s" (string ex))
     | AfterDetermined.Ignore -> ()
 
-  let tryWith' name (f : unit -> _ IDeferred) (handler : Exception -> _ IDeferred) afterDetermined =
+  let tryWith' name (f : unit -> _ IDeferred) (handler : exn -> _ IDeferred) afterDetermined =
     let v = Deferred.createVar ()
     let mutable exceptionOccurred = false
     let t = createNamed name
     detach t
     uponException t (fun ex ->
-      if Deferred.isDetermined v then
+      if Deferred.isDetermined v || exceptionOccurred then
         raiseAfterDetermined afterDetermined ex
       else
-        if exceptionOccurred then
-          raiseAfterDetermined (AfterDetermined.dontRaise afterDetermined) ex
-        else
-          exceptionOccurred <- true
-          Deferred.upon (handler ex) (fun x -> Deferred.set v x)
+        exceptionOccurred <- true
+        Deferred.upon (handler ex) (fun x -> Deferred.set v x)
     )
-    run t (fun () ->
-      Deferred.upon (f ()) (fun x ->
+    let result = run t f
+    match result with
+    | Result.Success d ->
+      Deferred.upon d (fun x ->
         if not exceptionOccurred then
           Deferred.set v x
       )
-    )
+    | Result.Failure _ -> ()
     v :> _ IDeferred
 
   let tryWith f handler afterDetermined =
     tryWith' "Supervisor.tryWith" f handler afterDetermined
 
-  module Result =
-    type 'a T =
-    | Result of 'a
-    | Exception of Exception
-
   let tryFinally (f : unit -> _ IDeferred) (finalizer : unit -> _ IDeferred) =
     let d =
       tryWith'
         "Supervisor.tryFinally"
-        (fun () -> Deferred.map (f ()) (fun x -> Result.Result x))
-        (fun ex -> Deferred.create (Result.Exception ex))
+        (fun () -> Deferred.map (f ()) (fun x -> Result.Success x))
+        (fun ex -> Deferred.create (Result.Failure ex))
         AfterDetermined.Log
     Deferred.bind d (fun result ->
       Deferred.map (finalizer ()) (fun () ->
         match result with
-        | Result.Result x -> x
-        | Result.Exception ex -> systemRaise ex
+        | Result.Success x -> x
+        | Result.Failure ex -> systemRaise ex
       )
     )

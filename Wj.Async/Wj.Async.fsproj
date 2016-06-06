@@ -44,6 +44,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Result.fsi" />
+    <Compile Include="Result.fs" />
     <Compile Include="ISupervisor.fs" />
     <Compile Include="IDeferred.fs" />
     <Compile Include="IVar.fs" />

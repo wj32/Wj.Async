@@ -42,7 +42,7 @@ module Dispatcher =
             )
             match f with
             | Some (supervisor, f) ->
-              supervisor.Run(f)
+              supervisor.Run(f) |> ignore
               loop ()
             | None ->
               d.Get()
