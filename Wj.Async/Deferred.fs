@@ -103,54 +103,6 @@ module Deferred =
 
     let create () = Never
 
-  module private Mapping =
-    [<ReferenceEqualityAttribute>]
-    type State<'a, 'b> =
-      | Pending of parent : 'a IDeferred * mappingSupervisor : ISupervisor * mapping : ('a -> 'b)
-      | Done of 'b
-
-    [<ReferenceEqualityAttribute>]
-    type T<'a, 'b> =
-      { mutable state : State<'a, 'b>; }
-
-      interface 'b IDeferred with
-        member t.Upon(f) = (t :> _ IDeferred).Upon((ThreadShared.currentSupervisor (), f))
-
-        member t.Upon((supervisor, f)) =
-          let dispatcher = ThreadShared.currentDispatcher ()
-          match t.state with
-          | Pending (parent, mappingSupervisor, mapping) ->
-            upon' parent (mappingSupervisor, (fun x ->
-              let y =
-                match t.state with
-                | Pending _ ->
-                  let y = mapping x
-                  t.state <- Done y
-                  y
-                | Done y -> y
-              dispatcher.Enqueue(supervisor, fun () -> f y)
-            ))
-          | Done y ->
-            dispatcher.Enqueue(supervisor, fun () -> f y)
-
-        member t.Get() =
-          match t.state with
-          | Pending _ -> invalidOp DeferredNotDetermined
-          | Done y -> y
-
-        member t.TryGet() =
-          match t.state with
-          | Pending _ -> None
-          | Done y -> Some y
-
-        member t.IsDetermined =
-          match t.state with
-          | Pending _ -> false
-          | Done y -> true
-
-    let create parent mapping =
-      { state = Pending (parent, ThreadShared.currentSupervisor (), mapping); }
-
   module private Node =
     [<ReferenceEqualityAttribute>]
     type 'a Unlinked =
@@ -260,7 +212,10 @@ module Deferred =
     upon t (fun x -> link v (f x))
     v :> _ IDeferred
 
-  let map t f = Mapping.create t f :> _ IDeferred
+  let map t f =
+    let v = createVar ()
+    upon t (fun x -> set v (f x))
+    v :> _ IDeferred
 
   let join t = bind t id
 
@@ -281,25 +236,22 @@ module Deferred =
     )
     v :> _ IDeferred
 
-  let allForget (ts : unit IDeferred list) = map (all ts) ignore
-
-  let both (t1 : 'a IDeferred) (t2 : 'b IDeferred) =
-    let mutable x1 = Unchecked.defaultof<'a>
-    let mutable x2 = Unchecked.defaultof<'b>
+  let allForget (ts : unit IDeferred list) =
+    let count = List.length ts
     let mutable completed = 0
     let v = createVar ()
-    let increment () =
-      completed <- completed + 1
-      if completed = 2 then
-        set v (x1, x2)
-    upon t1 (fun x ->
-      x1 <- x
-      increment ()
+    ts |> List.iter (fun t ->
+      upon t (fun x ->
+        completed <- completed + 1
+        if completed = count then
+          set v ()
+      )
     )
-    upon t2 (fun x ->
-      x2 <- x
-      increment ()
-    )
+    v :> _ IDeferred
+
+  let both (t1 : 'a IDeferred) (t2 : 'b IDeferred) =
+    let v = createVar ()
+    upon t1 (fun x1 -> upon t2 (fun x2 -> set v (x1, x2)))
     v :> _ IDeferred
 
   let allUnit ts = allForget ts
