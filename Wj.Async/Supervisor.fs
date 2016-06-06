@@ -113,23 +113,26 @@ module Supervisor =
     | AfterDetermined.Ignore -> ()
 
   let tryWith' name (f : unit -> _ IDeferred) (handler : exn -> _ IDeferred) afterDetermined =
-    let v = Deferred.createVar ()
-    let mutable exceptionOccurred = false
+    let v = Deferred.createNode ()
+    let mutable writer = Some v
     let t = createNamed name
     detach t
     uponException t (fun ex ->
-      if Deferred.isDetermined v || exceptionOccurred then
-        raiseAfterDetermined afterDetermined ex
-      else
-        exceptionOccurred <- true
-        Deferred.upon (handler ex) (fun x -> Deferred.set v x)
+      match writer with
+      | Some v ->
+        Deferred.link v (handler ex)
+        writer <- None
+      | None -> raiseAfterDetermined afterDetermined ex
     )
     let result = run t f
     match result with
     | Result.Success d ->
       Deferred.upon d (fun x ->
-        if not exceptionOccurred then
-          Deferred.set v x
+        match writer with
+        | Some v ->
+          Deferred.link v d
+          writer <- None
+        | None -> ()
       )
     | Result.Failure _ -> ()
     v :> _ IDeferred
