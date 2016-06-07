@@ -163,7 +163,7 @@ module Supervisor =
       tryWith'
         "Supervisor.tryFinally"
         (fun () -> Deferred.map (f ()) (fun x -> Result.Success x))
-        (fun ex -> Deferred.create (Result.Failure ex))
+        (fun ex -> Deferred.value (Result.Failure ex))
         AfterDetermined.Log
     Deferred.bind d (fun result ->
       Deferred.map (finalizer ()) (fun () ->

@@ -215,17 +215,17 @@ module Deferred =
 
     let create () = {state = Unlinked (RegistrationList.create ())}
 
-  let create x = Var.createDone x :> _ IDeferred
+  let value x = Var.createDone x :> _ IDeferred
 
   let createVar () = Var.createPending () :> _ IVar
 
   let createNode () = Node.create () :> _ INode
 
-  let unit = create ()
+  let unit = value ()
 
   let never () = Never.create () :> _ IDeferred
 
-  let ``return`` x = create x
+  let ``return`` x = value x
 
   let bind t (f : _ -> _ IDeferred) =
     let v = createNode ()
@@ -242,32 +242,40 @@ module Deferred =
   let forget t = map t ignore
 
   let all (ts : _ IDeferred list) =
-    let count = List.length ts
-    let xs = Array.zeroCreate count
-    let mutable completed = 0
-    let v = createVar ()
-    ts |> List.iteri (fun i t ->
-      upon t (fun x ->
-        xs.[i] <- x
-        completed <- completed + 1
-        if completed = count then
-          set v (List.ofArray xs)
+    if List.isEmpty ts then
+      value List.empty
+    else
+      let mutable count = 0
+      let mutable completed = 0
+      let xs = Array.zeroCreate count
+      let v = createVar ()
+      ts |> List.iteri (fun i t ->
+        count <- count + 1
+        upon t (fun x ->
+          xs.[i] <- x
+          completed <- completed + 1
+          if completed = count then
+            set v (List.ofArray xs)
+        )
       )
-    )
-    v :> _ IDeferred
+      v :> _ IDeferred
 
   let allForget (ts : unit IDeferred list) =
-    let count = List.length ts
-    let mutable completed = 0
-    let v = createVar ()
-    ts |> List.iter (fun t ->
-      upon t (fun x ->
-        completed <- completed + 1
-        if completed = count then
-          set v ()
+    if List.isEmpty ts then
+      unit
+    else
+      let mutable count = 0
+      let mutable completed = 0
+      let v = createVar ()
+      ts |> List.iter (fun t ->
+        count <- count + 1
+        upon t (fun x ->
+          completed <- completed + 1
+          if completed = count then
+            set v ()
+        )
       )
-    )
-    v :> _ IDeferred
+      v :> _ IDeferred
 
   let both (t1 : 'a IDeferred) (t2 : 'b IDeferred) =
     let v = createVar ()
@@ -283,8 +291,8 @@ module Deferred =
     registrations <- ts |> List.mapi (fun i t ->
       register' t (dispatcher.RootSupervisor, (fun x ->
         if not v.IsDetermined then
-          set v (f i x)
           registrations |> List.iter Registration.remove
+          set v (f i x)
       ))
     )
     v :> _ IDeferred
@@ -321,3 +329,41 @@ module Deferred =
     let (>>|) t f = map t f
 
     let (>>>) t f = upon t f
+
+  [<Interface>]
+  type 'b IChoice =
+    abstract member Register : supervisedCallback : unit SupervisedCallback -> IRegistration
+    abstract member TryGetApply : unit -> 'b option
+
+  module Choice =
+    type T<'a, 'b> =
+      | Choice of deferred : 'a IDeferred * mapping : ('a -> 'b)
+
+      interface 'b IChoice with
+        member t.Register((supervisor, callback)) =
+          match t with Choice (d, _) -> d.Register((supervisor, ignore >> callback))
+
+        member t.TryGetApply() = match t with Choice (d, f) -> tryGet d |> Option.map f
+
+    let create d f = Choice (d, f)
+
+  let choice d f = Choice.create d f :> _ IChoice
+
+  let choose (choices : _ IChoice list) =
+    let v = createVar ()
+    let rec setResult (cs : _ IChoice list) =
+      match cs with
+      | [] -> assert false
+      | c :: rest ->
+        match c.TryGetApply() with
+        | Some y -> set v y
+        | None -> setResult rest
+    let mutable registrations = []
+    registrations <- choices |> List.map (fun c ->
+      c.Register(ThreadShared.currentSupervisor (), (fun () ->
+        if not v.IsDetermined then
+          registrations |> List.iter Registration.remove
+          setResult choices
+      ))
+    )
+    v :> _ IDeferred

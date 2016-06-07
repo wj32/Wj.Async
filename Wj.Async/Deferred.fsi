@@ -20,24 +20,25 @@ module Deferred =
   val link : 'a INode -> parent : 'a IDeferred -> unit
   val tryLink : 'a INode -> parent : 'a IDeferred -> bool
 
-  val create : value : 'a -> 'a IDeferred
+  val value : value : 'a -> 'a IDeferred
   val createVar : unit -> 'a IVar
   val createNode : unit -> 'a INode
   val unit : unit IDeferred
   val never : unit -> 'a IDeferred
 
   // Monad
-  val ``return`` : value : 'a -> 'a IDeferred // Same as create
+
+  val ``return`` : value : 'a -> 'a IDeferred // Same as value
   val bind : 'a IDeferred -> f : ('a -> 'b IDeferred) -> 'b IDeferred
 
   // Standard monad functions
+
   val map : 'a IDeferred -> f : ('a -> 'b) -> 'b IDeferred
   val join : 'a IDeferred IDeferred -> 'a IDeferred
   val forget : 'a IDeferred -> unit IDeferred
   val all : 'a IDeferred list -> 'a list IDeferred
   val allForget : unit IDeferred list -> unit IDeferred
 
-  // Extra convenience functions
   val both : 'a IDeferred -> 'b IDeferred -> ('a * 'b) IDeferred
   val allUnit : unit IDeferred list -> unit IDeferred
   val any : 'a IDeferred list -> 'a IDeferred
@@ -46,9 +47,12 @@ module Deferred =
   val dontWaitFor : unit IDeferred -> unit
 
   // Conversion
+
   val ofAsync : 'a Async -> unit Async * 'a IDeferred
   val ofTask : 'a Task -> 'a IDeferred
   val ofTaskUnit : Task -> unit IDeferred
+
+  // Infix operators
 
   module Infix =
     // Standard monad operators
@@ -56,3 +60,13 @@ module Deferred =
     val (>>|) : 'a IDeferred -> ('a -> 'b) -> 'b IDeferred
 
     val (>>>) : 'a IDeferred -> ('a -> unit) -> unit
+
+  // Choice
+
+  [<Interface>]
+  type 'b IChoice =
+    abstract member Register : supervisedCallback : unit SupervisedCallback -> IRegistration
+    abstract member TryGetApply : unit -> 'b option
+
+  val choice : 'a IDeferred -> f : ('a -> 'b) -> 'b IChoice
+  val choose : 'b IChoice list -> 'b IDeferred

@@ -28,7 +28,7 @@ type DeferredBuilder() =
       e.Dispose()
       Deferred.unit
 
-  member this.Return(x) = Deferred.create x
+  member this.Return(x) = Deferred.value x
 
   member this.ReturnFrom(t) = t
 
