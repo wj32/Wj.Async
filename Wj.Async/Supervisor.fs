@@ -9,6 +9,7 @@ module Supervisor =
     "Handlers cannot be registered on the root supervisor."
 
   // ISupervisor functions
+  let dispatcher (t : ISupervisor) = t.Dispatcher
   let parent (t : ISupervisor) = t.Parent
   let name (t : ISupervisor) = t.Name
   let detach (t : ISupervisor) = t.Detach()
@@ -21,10 +22,13 @@ module Supervisor =
   module Child =
     type T =
       { name : string;
+        mutable dispatcher : IDispatcher;
         mutable parent : ISupervisor option;
         mutable handlers : exn SupervisedCallback list; }
 
       interface ISupervisor with
+        member t.Dispatcher = t.dispatcher
+
         member t.Parent = t.parent
 
         member t.Name = t.name
@@ -63,15 +67,18 @@ module Supervisor =
 
     let create name =
       { name = name;
+        dispatcher = ThreadShared.currentDispatcher ();
         parent = ThreadShared.tryCurrentSupervisor ();
         handlers = []; }
       :> ISupervisor
 
   module Root =
     type T =
-      | Root
+      | Root of dispatcher : IDispatcher
 
       interface ISupervisor with
+        member t.Dispatcher = match t with Root dispatcher -> dispatcher
+
         member t.Parent = None
 
         member t.Name = "Root"
@@ -88,13 +95,15 @@ module Supervisor =
 
         member t.Run(f) = Result.tryWith f
 
-  let root = Root.Root :> ISupervisor
+    let create dispatcher = Root dispatcher
 
   let current () = ThreadShared.currentSupervisor ()
 
   let create () = Child.create "Unnamed supervisor"
 
   let createNamed name = Child.create name
+
+  let createRoot dispatcher = Root.create dispatcher :> ISupervisor
 
   let supervise (f : unit -> _ IDeferred) observer =
     let t = createNamed "Supervisor.supervise"
@@ -125,6 +134,7 @@ module Supervisor =
         startHandlingAfterDetermined ()
         d
       else
+        let dispatcher = ThreadShared.currentDispatcher ()
         let reader = Deferred.createNode ()
         let mutable writer = Some reader
         let write v d =
@@ -135,7 +145,7 @@ module Supervisor =
           | Some v -> write v (handler ex)
           | None -> handleAfterDetermined afterDetermined ex
         )
-        Deferred.upon' d (root, (fun x ->
+        Deferred.upon' d (dispatcher.RootSupervisor, (fun x ->
           match writer with
           | Some v -> write v d
           | None -> ()

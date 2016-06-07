@@ -6,6 +6,7 @@ exception SupervisorChildException of supervisorNames : string list * innerExcep
 
 module Supervisor =
   // ISupervisor functions
+  val dispatcher : ISupervisor -> IDispatcher
   val parent : ISupervisor -> ISupervisor option
   val name : ISupervisor -> string
   val detach : ISupervisor -> unit
@@ -14,10 +15,10 @@ module Supervisor =
   val uponException' : ISupervisor -> supervisedHandler : exn SupervisedCallback -> unit
   val run : ISupervisor -> f : (unit -> 'a) -> Result.T<'a, exn>
 
-  val root : ISupervisor
   val current : unit -> ISupervisor
   val create : unit -> ISupervisor
   val createNamed : name : string -> ISupervisor
+  val createRoot : IDispatcher -> ISupervisor
 
   val supervise
     : f : (unit -> 'a IDeferred)

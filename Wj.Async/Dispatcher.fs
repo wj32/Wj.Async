@@ -12,7 +12,8 @@ module Dispatcher =
   [<ReferenceEquality>]
   type T =
     { queue : unit SupervisedCallback Queue;
-      queueLock : obj; }
+      queueLock : obj;
+      mutable rootSupervisor : ISupervisor; }
 
     interface IDispatcher with
       member t.Enqueue(supervisedCallback) =
@@ -22,10 +23,10 @@ module Dispatcher =
         )
 
       member t.Run(f) =
-        let supervisor = Supervisor.root
+        let supervisor = t.rootSupervisor
         ThreadShared.pushSupervisor supervisor
+        ThreadShared.pushDispatcher t
         try
-          ThreadShared.pushDispatcher (t :> IDispatcher)
           let d = f ()
           d.Upon(fun _ ->
             lock t.queueLock (fun () ->
@@ -48,16 +49,19 @@ module Dispatcher =
             | None ->
               d.Get()
           let result = loop ()
-          ThreadShared.popDispatcher (t :> IDispatcher)
           result
         finally
+          ThreadShared.popDispatcher t
           ThreadShared.popSupervisor supervisor
 
-      member t.RootSupervisor = Supervisor.root
+      member t.RootSupervisor = t.rootSupervisor
 
   let current () = ThreadShared.currentDispatcher ()
 
   let create () =
-    { queue = new Queue<ISupervisor * (unit -> unit)>();
-      queueLock = new obj(); }
-    :> IDispatcher
+    let t =
+      { queue = new Queue<ISupervisor * (unit -> unit)>();
+        queueLock = new obj();
+        rootSupervisor = Unchecked.defaultof<ISupervisor>; }
+    t.rootSupervisor <- Supervisor.createRoot t
+    t :> IDispatcher
