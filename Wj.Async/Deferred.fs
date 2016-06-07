@@ -367,3 +367,21 @@ module Deferred =
       ))
     )
     v :> _ IDeferred
+
+  module Repeat =
+    type T<'state, 'a> = Repeat of 'state | Done of 'a
+
+  let repeat (f : _ -> Repeat.T<_, _> IDeferred) state =
+    let v = createVar ()
+    let rec loop state =
+      upon (f state) (fun r ->
+        match r with
+        | Repeat.Repeat state -> loop state
+        | Repeat.Done x -> set v x
+      )
+    loop state
+    v :> _ IDeferred
+
+  let repeatForever (f : _ -> _ IDeferred) state =
+    let rec loop state = upon (f state) (fun state -> loop state)
+    loop state

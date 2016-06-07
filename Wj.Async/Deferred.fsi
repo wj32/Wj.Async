@@ -70,3 +70,11 @@ module Deferred =
 
   val choice : 'a IDeferred -> f : ('a -> 'b) -> 'b IChoice
   val choose : 'b IChoice list -> 'b IDeferred
+
+  // Repeat
+
+  module Repeat =
+    type T<'state, 'a> = Repeat of 'state | Done of 'a
+
+  val repeat : f : ('state -> Repeat.T<'state, 'a> IDeferred) -> state : 'state -> 'a IDeferred
+  val repeatForever : f : ('state -> 'state IDeferred) -> state : 'state -> unit
