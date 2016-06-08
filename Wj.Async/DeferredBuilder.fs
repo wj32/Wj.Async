@@ -25,11 +25,9 @@ type DeferredBuilder() =
     Supervisor.tryWith body handler Supervisor.AfterDetermined.Log
 
   member this.Using(disposable : #IDisposable, body) =
-    // TODO: If disposable is a struct, it will get boxed in the check below. Find a way of handling
-    // this.
     Supervisor.tryFinally
       (fun () -> body disposable)
-      (fun () -> (if not (obj.ReferenceEquals(disposable, null)) then disposable.Dispose()); Deferred.unit)
+      (fun () -> (if not (isNull disposable) then disposable.Dispose()); Deferred.unit)
 
   member this.While(guard, body) =
     if guard () then
