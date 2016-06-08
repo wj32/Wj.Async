@@ -241,41 +241,24 @@ module Deferred =
 
   let forget t = map t ignore
 
-  let all (ts : _ IDeferred list) =
-    if List.isEmpty ts then
-      value List.empty
-    else
-      let mutable count = 0
-      let mutable completed = 0
-      let xs = Array.zeroCreate count
-      let v = createVar ()
-      ts |> List.iteri (fun i t ->
-        count <- count + 1
-        upon t (fun x ->
-          xs.[i] <- x
-          completed <- completed + 1
-          if completed = count then
-            set v (List.ofArray xs)
-        )
-      )
+  let inline foldiList (f : _ -> _ -> _ -> _ IDeferred) state xs =
+    match xs with
+    | [] -> value state
+    | x :: xs ->
+      let v = createNode ()
+      let rec loop i state x xs =
+        match xs with
+        | [] -> link v (f i state x)
+        | x' :: xs' -> upon (f i state x) (fun state -> loop (i + 1) state x' xs')
+      loop 0 state x xs
       v :> _ IDeferred
 
-  let allForget (ts : unit IDeferred list) =
-    if List.isEmpty ts then
-      unit
-    else
-      let mutable count = 0
-      let mutable completed = 0
-      let v = createVar ()
-      ts |> List.iter (fun t ->
-        count <- count + 1
-        upon t (fun () ->
-          completed <- completed + 1
-          if completed = count then
-            set v ()
-        )
-      )
-      v :> _ IDeferred
+  let inline mapiListSequential (f : _ -> _ -> _ IDeferred) xs =
+    map (foldiList (fun i acc x -> map (f i x) (fun y -> y :: acc)) [] xs) List.rev
+
+  let all ts = mapiListSequential (fun i t -> t) ts
+
+  let allForget ts = foldiList (fun i () t -> t) () ts
 
   module Infix =
     let (>>=) t f = bind t f
@@ -290,7 +273,7 @@ module Deferred =
     upon t1 (fun x1 -> upon t2 (fun x2 -> set v (x1, x2)))
     v :> _ IDeferred
 
-  let anyiMap (ts : _ IDeferred list) f =
+  let mapAnyi (ts : _ IDeferred list) f =
     let dispatcher = ThreadShared.currentDispatcher ()
     let v = createVar ()
     let mutable registrations = []
@@ -303,11 +286,11 @@ module Deferred =
     )
     v :> _ IDeferred
 
-  let anyi (ts : _ IDeferred list) = anyiMap ts (fun i x -> (i, x))
+  let anyi (ts : _ IDeferred list) = mapAnyi ts (fun i x -> (i, x))
 
-  let any (ts : _ IDeferred list) = anyiMap ts (fun i x -> x)
+  let any (ts : _ IDeferred list) = mapAnyi ts (fun i x -> x)
 
-  let anyUnit (ts : _ IDeferred list) = anyiMap ts (fun i x -> ())
+  let anyUnit (ts : _ IDeferred list) = mapAnyi ts (fun i x -> ())
 
   let dontWaitFor (t : unit IDeferred) = ()
 
@@ -322,7 +305,6 @@ module Deferred =
         t.UponException(raise)
         map (finalizer ()) (fun () -> get d)
       else
-        let dispatcher = ThreadShared.currentDispatcher ()
         let reader = createVar ()
         let mutable writer = Some reader
         t.UponException(fun ex ->
@@ -440,39 +422,17 @@ module Deferred =
 
     let fold f state xs = foldi (fun i args -> f args) state xs
 
-    let all (ts : _ IDeferred array) =
-      let count = Array.length ts
-      if count = 0 then
+    let inline mapiSequential (f : _ -> _ -> _ IDeferred) xs =
+      let length = Array.length xs
+      if length = 0 then
         value Array.empty
       else
-        let mutable completed = 0
-        let xs = Array.zeroCreate count
-        let v = createVar ()
-        ts |> Array.iteri (fun i t ->
-          upon t (fun x ->
-            xs.[i] <- x
-            completed <- completed + 1
-            if completed = count then
-              set v xs
-          )
-        )
-        v :> _ IDeferred
+        let ys = Array.zeroCreate length
+        foldi (fun i ys x -> f i x >>| (fun y -> ys.[i] <- y; ys)) ys xs
 
-    let allUnit (ts : unit IDeferred array) =
-      let count = Array.length ts
-      if count = 0 then
-        unit
-      else
-        let mutable completed = 0
-        let v = createVar ()
-        ts |> Array.iter (fun t ->
-          upon t (fun () ->
-            completed <- completed + 1
-            if completed = count then
-              set v ()
-          )
-        )
-        v :> _ IDeferred
+    let all ts = mapiSequential (fun i t -> t) ts
+
+    let allUnit ts = foldi (fun i () t -> t) () ts
 
     let iteri p f xs =
       match p with
@@ -483,9 +443,7 @@ module Deferred =
 
     let mapi p f xs =
       match p with
-      | P.Sequential ->
-        let ys = Array.zeroCreate (Array.length xs)
-        xs |> foldi (fun i () x -> f i x >>| (fun y -> ys.[i] <- y)) () >>| (fun () -> ys)
+      | P.Sequential -> mapiSequential f xs
       | P.Parallel -> xs |> Array.mapi (fun i x -> f i x) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
@@ -524,17 +482,7 @@ module Deferred =
   module List =
     module P = Parallelism
 
-    let foldi (f : _ -> _ -> _ -> _ IDeferred) state xs =
-      match xs with
-      | [] -> value state
-      | x :: xs ->
-        let v = createNode ()
-        let rec loop i state x xs =
-          match xs with
-          | [] -> f i state x >-- v
-          | x' :: xs' -> f i state x >>> (fun state -> loop (i + 1) state x' xs')
-        loop 0 state x xs
-        v :> _ IDeferred
+    let foldi f state xs = foldiList f state xs
 
     let fold f state xs = foldi (fun i args -> f args) state xs
 
@@ -551,7 +499,7 @@ module Deferred =
 
     let mapi p f xs =
       match p with
-      | P.Sequential -> xs |> foldi (fun i ys x -> f i x >>| (fun y -> y :: ys)) [] >>| List.rev
+      | P.Sequential -> mapiListSequential f xs
       | P.Parallel -> xs |> List.mapi (fun i x -> f i x) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
@@ -579,6 +527,101 @@ module Deferred =
             d >>> (fun y -> match y with Some _ -> d >-- v | None -> loop x' xs'')
         loop x xs
         v :> _ IDeferred
+
+    let tryFind (f : _ -> bool IDeferred) xs =
+      xs |> tryPick (fun x -> f x >>| (fun b -> if b then Some x else None))
+
+  module Seq =
+    module P = Parallelism
+
+    let foldi (f : _ -> _ -> _ -> _ IDeferred) state (xs : _ seq) =
+      match xs with
+      | :? (_ list) as xs -> List.foldi f state xs
+      | :? (_ array) as xs -> Array.foldi f state xs
+      | _ ->
+        let e = xs.GetEnumerator()
+        tryFinally (fun () ->
+          if e.MoveNext() then
+            let v = createNode ()
+            let rec loop i state x =
+              if e.MoveNext() then
+                f i state x >>> (fun state -> loop (i + 1) state e.Current)
+              else
+                f i state x >-- v
+            loop 0 state e.Current
+            v :> _ IDeferred
+          else
+            value state
+        ) (fun () -> e.Dispose(); unit)
+
+    let fold f state xs = foldi (fun i args -> f args) state xs
+
+    let inline mapiSequential (f : _ -> _ -> _ IDeferred) xs =
+      let list = new System.Collections.Generic.List<_>()
+      let ys = list :> _ seq
+      foldi (fun i ys x -> f i x >>| (fun y -> list.Add(y); ys)) ys xs
+
+    let all ts = mapiSequential (fun i t -> t) ts
+
+    let allUnit ts = foldi (fun i () t -> t) () ts
+
+    let iteri p f (xs : _ seq) =
+      match xs with
+      | :? (_ list) as xs -> List.iteri p f xs
+      | :? (_ array) as xs -> Array.iteri p f xs
+      | _ ->
+        match p with
+        | P.Sequential -> xs |> foldi (fun i () x -> f i x) ()
+        | P.Parallel -> xs |> Seq.mapi (fun i x -> f i x) |> allUnit
+
+    let iter p f xs = iteri p (fun i args -> f args) xs
+
+    let mapi p f (xs : _ seq) =
+      // TODO: Remove upcasts when xs is a list or array, after F# gets support for covariance in
+      // generics.
+      match xs with
+      | :? (_ list) as xs -> List.mapi p f xs >>| (fun ys -> ys :> _ seq)
+      | :? (_ array) as xs -> Array.mapi p f xs >>| (fun ys -> ys :> _ seq)
+      | _ ->
+        match p with
+        | P.Sequential -> mapiSequential f xs
+        | P.Parallel -> xs |> Seq.mapi (fun i x -> f i x) |> all
+
+    let map p f xs = mapi p (fun i args -> f args) xs
+
+    let init p length f = Seq.init length id |> map p f
+
+    let concatMap p (f : _ -> _ seq IDeferred) xs = map p f xs >>| Seq.concat
+
+    let choose p f xs = map p f xs >>| Seq.choose id
+
+    let filter2 xs bs =
+      let list = new System.Collections.Generic.List<_>()
+      Seq.iter2 (fun x b -> if b then list.Add(x)) xs bs
+      list :> _ seq
+
+    let filter p f xs = map p f xs >>| filter2 xs
+
+    let tryPick (f : _ -> _ option IDeferred) (xs : _ seq) =
+      match xs with
+      | :? (_ list) as xs -> List.tryPick f xs
+      | :? (_ array) as xs -> Array.tryPick f xs
+      | _ ->
+        let e = xs.GetEnumerator()
+        tryFinally (fun () ->
+          if e.MoveNext() then
+            let v = createNode ()
+            let rec loop x =
+              if e.MoveNext() then
+                let d = f x
+                d >>> (fun y -> match y with Some _ -> d >-- v | None -> loop e.Current)
+              else
+                f x >-- v
+            loop e.Current
+            v :> _ IDeferred
+          else
+            value None
+        ) (fun () -> e.Dispose(); unit)
 
     let tryFind (f : _ -> bool IDeferred) xs =
       xs |> tryPick (fun x -> f x >>| (fun b -> if b then Some x else None))

@@ -46,21 +46,4 @@ type DeferredBuilder() =
     else
       Deferred.unit
 
-  member this.For(xs : _ seq, body : _ -> unit IDeferred) =
-    this.Using(
-      xs.GetEnumerator(),
-      fun e ->
-        if e.MoveNext() then
-          let v = Deferred.createVar ()
-          let rec loop x =
-            Deferred.upon (body x) (fun () ->
-              if e.MoveNext() then
-                loop e.Current
-              else
-                Deferred.set v ()
-            )
-          loop e.Current
-          v :> _ IDeferred
-        else
-          Deferred.unit
-    )
+  member this.For(xs, body) = Deferred.Seq.iter Parallelism.Sequential body xs

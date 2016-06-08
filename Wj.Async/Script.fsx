@@ -121,15 +121,37 @@ let testExceptions () =
 
   printfn "Dispatcher stopped."
 
+let testFor () =
+  Dispatcher.run dispatcher (fun () -> deferred {
+    for i in 1 .. 10 do
+      do! afterMs 100
+      for j in 1 .. 5 do
+        printfn "(%d, %d)" i j
+        do! afterMs 10
+      do! Deferred.unit
+  })
+
 let wait ms = deferred {
   do! afterMs ms
   printfn "I waited %d ms." ms
+}
+
+let waitAndReturn ms value = deferred {
+  do! afterMs ms
+  printfn "I waited %d ms." ms
+  return value
 }
 
 let testAll () =
   Dispatcher.run dispatcher (fun () -> deferred {
     do! Deferred.allUnit [wait 1000; wait 100; wait 200; wait 5]
     printfn "All done."
+    let! values = Deferred.all [waitAndReturn 200 1; waitAndReturn 100 2; waitAndReturn 150 3; waitAndReturn 5 4]
+    printfn "All done: %A" values
+    let! values = Deferred.Array.all [|waitAndReturn 200 1; waitAndReturn 100 2; waitAndReturn 150 3; waitAndReturn 5 4|]
+    printfn "All done: %A" values
+    let! values = Deferred.Seq.all [|waitAndReturn 200 1; waitAndReturn 100 2; waitAndReturn 150 3; waitAndReturn 5 4|]
+    printfn "All done: %A" values
   })
 
 let testAny () =
@@ -190,4 +212,29 @@ let testUsing () =
     use _ = null
 
     printfn "Done"
+  })
+
+let testSequenceFunctions () =
+  Dispatcher.run dispatcher (fun () -> deferred {
+    let config = [(125, 1); (250, 2); (500, 3); (1000, 4); (10, 5); (20, 6); (5, 7)]
+    let! values = config |> Deferred.List.map Parallelism.Sequential ((<||) waitAndReturn)
+    printfn "List sequential: %A" values
+    let! values = config |> Deferred.List.map Parallelism.Parallel ((<||) waitAndReturn)
+    printfn "List parallel: %A" values
+
+    let! three = config |> Deferred.List.tryFind (fun c -> c ||> waitAndReturn >>| ((=) 5))
+    printfn "List tryFind: %A" three
+    let! nothing = config |> Deferred.List.tryFind (fun c -> c ||> waitAndReturn >>| ((=) 99))
+    printfn "List tryFind: %A" nothing
+
+    let config = [|(125, 1); (250, 2); (500, 3); (1000, 4); (10, 5); (20, 6); (5, 7)|]
+    let! values = config |> Deferred.Array.map Parallelism.Sequential ((<||) waitAndReturn)
+    printfn "Array sequential: %A" values
+    let! values = config |> Deferred.Array.map Parallelism.Parallel ((<||) waitAndReturn)
+    printfn "Array parallel: %A" values
+
+    let! three = config |> Deferred.Array.tryFind (fun c -> c ||> waitAndReturn >>| ((=) 5))
+    printfn "Array tryFind: %A" three
+    let! nothing = config |> Deferred.Array.tryFind (fun c -> c ||> waitAndReturn >>| ((=) 99))
+    printfn "Array tryFind: %A" nothing
   })
