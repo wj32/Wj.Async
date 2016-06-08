@@ -23,8 +23,9 @@ module Result =
     val (>>=) : T<'a, 'error> -> ('a -> T<'b, 'error>) -> T<'b, 'error>
     val (>>|) : T<'a, 'error> -> ('a -> 'b) -> T<'b, 'error>
 
-  // Conversion
+  // General
 
+  val mapError : T<'a, 'error> -> ('error -> 'error2) -> T<'a, 'error2>
   val ofSuccess : 'a -> T<'a, 'error> // same as ``return``
   val ofFailure : 'error -> T<'a, 'error>
 

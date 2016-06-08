@@ -18,6 +18,8 @@ module Deferred =
   val link : 'a INode -> parent : 'a IDeferred -> unit
   val tryLink : 'a INode -> parent : 'a IDeferred -> bool
 
+  // Creation
+
   val value : value : 'a -> 'a IDeferred
   val createVar : unit -> 'a IVar
   val createNode : unit -> 'a INode
@@ -41,6 +43,8 @@ module Deferred =
     val (>>|) : 'a IDeferred -> ('a -> 'b) -> 'b IDeferred
     val (>>>) : 'a IDeferred -> ('a -> unit) -> unit
     val (>--) : 'a IDeferred -> 'a INode -> unit
+
+  // General
 
   val allUnit : unit IDeferred list -> unit IDeferred
   val both : 'a IDeferred -> 'b IDeferred -> ('a * 'b) IDeferred

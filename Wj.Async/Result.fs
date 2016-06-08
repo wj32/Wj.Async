@@ -41,6 +41,8 @@ module Result =
     let (>>=) t f = bind t f
     let (>>|) t f = map t f
 
+  let mapError t f = match t with Success x -> Success x | Failure error -> Failure (f error)
+
   let ofSuccess x = ``return`` x
 
   let ofFailure error = Failure error
