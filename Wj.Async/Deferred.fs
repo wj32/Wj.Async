@@ -311,6 +311,40 @@ module Deferred =
 
   let dontWaitFor (t : unit IDeferred) = ()
 
+  // We define tryFinally in this module because we need it for sequence processing later on.
+  let tryFinally (f : unit -> _ IDeferred) (finalizer : unit -> _ IDeferred) =
+    let t = ChildSupervisor.create "tryFinally"
+    t.Detach()
+    let result = t.Run(f)
+    match result with
+    | Result.Success d ->
+      if isDetermined d then
+        t.UponException(raise)
+        map (finalizer ()) (fun () -> get d)
+      else
+        let dispatcher = ThreadShared.currentDispatcher ()
+        let reader = createVar ()
+        let mutable writer = Some reader
+        t.UponException(fun ex ->
+          match writer with
+          | Some _ ->
+            writer <- None
+            upon (finalizer ()) (fun () -> raise ex)
+          | None -> raise ex
+        )
+        upon d (fun x ->
+          match writer with
+          | Some v ->
+            writer <- None
+            upon (finalizer ()) (fun () -> set v x)
+          | None -> ()
+        )
+        reader :> _ IDeferred
+    | Result.Failure ex ->
+      t.UponException(raise)
+      upon (finalizer ()) (fun () -> raise ex)
+      never ()
+
   let ofAsync a =
     let v = createVar ()
     let a = async {

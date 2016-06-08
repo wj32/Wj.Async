@@ -2,8 +2,6 @@
 
 open System
 
-exception SupervisorChildException of supervisorNames : string list * innerException : exn
-
 module Supervisor =
   let [<Literal>] private cannotAddHandlerToRoot =
     "Handlers cannot be registered on the root supervisor."
@@ -19,60 +17,9 @@ module Supervisor =
     t.UponException(supervisedHandler)
   let run (t : ISupervisor) f = t.Run(f)
 
-  module Child =
-    type T =
-      { name : string;
-        mutable dispatcher : IDispatcher;
-        mutable parent : ISupervisor option;
-        mutable handlers : exn SupervisedCallback list; }
+  module Child = ChildSupervisor
 
-      interface ISupervisor with
-        member t.Dispatcher = t.dispatcher
-
-        member t.Parent = t.parent
-
-        member t.Name = t.name
-
-        member t.SendException(ex) =
-          t.handlers |> List.iter (fun (supervisor, handler) ->
-            supervisor.Run(fun () -> handler ex) |> ignore
-          )
-          match t.parent with
-          | Some parent ->
-            let ex' =
-              match ex with
-              | SupervisorChildException (supervisorNames, _) ->
-                SupervisorChildException (t.name :: supervisorNames, ex)
-              | ex ->
-                SupervisorChildException ([t.name], ex)
-            parent.SendException(ex')
-          | None -> ()
-
-        member t.Detach() = t.parent <- None
-
-        member t.UponException(handler) =
-          (t :> ISupervisor).UponException((ThreadShared.currentSupervisor (), handler))
-
-        member t.UponException(supervisedHandler) =
-          t.handlers <- supervisedHandler :: t.handlers
-
-        member t.Run(f) =
-          ThreadShared.pushSupervisor t
-          let result = Result.tryWith f
-          ThreadShared.popSupervisor t
-          match result with
-          | Result.Failure ex -> (t :> ISupervisor).SendException(ex)
-          | Result.Success _ -> ()
-          result
-
-    let create name =
-      { name = name;
-        dispatcher = ThreadShared.currentDispatcher ();
-        parent = ThreadShared.tryCurrentSupervisor ();
-        handlers = []; }
-      :> ISupervisor
-
-  module Root =
+  module private Root =
     type T =
       | Root of dispatcher : IDispatcher
 
@@ -122,8 +69,8 @@ module Supervisor =
     | AfterDetermined.Log -> stderr.WriteLine(sprintf "Unhandled exception after tryWith:\n%s" (string ex))
     | AfterDetermined.Ignore -> ()
 
-  let tryWith' name (f : unit -> _ IDeferred) (handler : exn -> _ IDeferred) afterDetermined =
-    let t = createNamed name
+  let tryWith (f : unit -> _ IDeferred) (handler : exn -> _ IDeferred) afterDetermined =
+    let t = createNamed "tryWith"
     detach t
     let startHandlingAfterDetermined () =
       uponException t (fun ex -> handleAfterDetermined afterDetermined ex)
@@ -138,8 +85,8 @@ module Supervisor =
         let reader = Deferred.createNode ()
         let mutable writer = Some reader
         let write v d =
-          Deferred.link v d
           writer <- None
+          Deferred.link v d
         uponException t (fun ex ->
           match writer with
           | Some v -> write v (handler ex)
@@ -155,20 +102,4 @@ module Supervisor =
       startHandlingAfterDetermined ()
       handler ex
 
-  let tryWith f handler afterDetermined =
-    tryWith' "Supervisor.tryWith" f handler afterDetermined
-
-  let tryFinally (f : unit -> _ IDeferred) (finalizer : unit -> _ IDeferred) =
-    let d =
-      tryWith'
-        "Supervisor.tryFinally"
-        (fun () -> Deferred.map (f ()) (fun x -> Result.Success x))
-        (fun ex -> Deferred.value (Result.Failure ex))
-        AfterDetermined.Log
-    Deferred.bind d (fun result ->
-      Deferred.map (finalizer ()) (fun () ->
-        match result with
-        | Result.Success x -> x
-        | Result.Failure ex -> raise ex
-      )
-    )
+  let tryFinally f finalizer = Deferred.tryFinally f finalizer

@@ -2,8 +2,6 @@
 
 open System
 
-exception SupervisorChildException of supervisorNames : string list * innerException : exn
-
 module Supervisor =
   // ISupervisor functions
   val dispatcher : ISupervisor -> IDispatcher

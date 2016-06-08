@@ -53,6 +53,10 @@ module Deferred =
   val anyUnit : 'a IDeferred list -> unit IDeferred
   val dontWaitFor : unit IDeferred -> unit
 
+  // Try-finally
+
+  val tryFinally : f : (unit -> 'a IDeferred) -> finalizer : (unit -> unit IDeferred) -> 'a IDeferred
+
   // Conversion
 
   val ofAsync : 'a Async -> unit Async * 'a IDeferred

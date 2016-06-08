@@ -10,6 +10,7 @@
 #load "IVar.fs"
 #load "INode.fs"
 #load "ThreadShared.fs"
+#load "ChildSupervisor.fs"
 #load "Deferred.fs"
 #load "Supervisor.fs"
 #load "Dispatcher.fs"
@@ -61,7 +62,10 @@ let testExceptions () =
                         do! afterMs 500
                         printfn "My supervisor is %s." (ThreadShared.currentSupervisor()).Name
                         printfn "My parent supervisor is %s." (ThreadShared.currentSupervisor()).Parent.Value.Name
-                        raise (invalidOp "Exception in inner supervisor!")
+                        try
+                          raise (invalidOp "Exception in inner supervisor!")
+                        finally
+                          printfn "Finally in inner supervisor!"
                       })
                       (fun ex -> printfn "Inner observer saw exception: %s" (string ex))
                 })

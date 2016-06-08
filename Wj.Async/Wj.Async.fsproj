@@ -52,11 +52,12 @@
     <Compile Include="RegistrationList.fsi" />
     <Compile Include="RegistrationList.fs" />
     <Compile Include="CoreTypes.fs" />
+    <Compile Include="IVar.fs" />
+    <Compile Include="INode.fs" />
     <Compile Include="Parallelism.fs" />
     <Compile Include="ThreadShared.fsi" />
     <Compile Include="ThreadShared.fs" />
-    <Compile Include="IVar.fs" />
-    <Compile Include="INode.fs" />
+    <Compile Include="ChildSupervisor.fs" />
     <Compile Include="Deferred.fsi" />
     <Compile Include="Deferred.fs" />
     <Compile Include="Supervisor.fsi" />

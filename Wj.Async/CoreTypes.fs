@@ -25,3 +25,5 @@ and [<Interface>] 'a IDeferred =
   abstract member IsDetermined : bool
   abstract member Get : unit -> 'a
   abstract member TryGet : unit -> 'a option
+
+exception SupervisorChildException of supervisorNames : string list * innerException : exn
