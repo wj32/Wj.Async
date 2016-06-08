@@ -160,3 +160,29 @@ let testChoice () =
           choice (afterMs 200) (fun () -> printfn "%s" "This should not display");
           choice v2 (fun () -> printfn "%s" "This should not display"); ]
   })
+
+[<Struct>]
+type MyStruct(x : int) =
+  interface System.IDisposable with
+    member this.Dispose() = printfn "Struct dispose!"
+
+type MyClass(x : int) =
+  interface System.IDisposable with
+    member this.Dispose() = printfn "Class dispose!"
+
+let testUsing () =
+  Dispatcher.run dispatcher (fun () -> deferred {
+    printfn "Default:"
+    using (new MyStruct(0)) (fun _ -> printfn "Struct default")
+    using (new MyStruct(1)) (fun _ -> printfn "Struct non-default")
+    using (new MyClass(0)) (fun _ -> printfn "Class")
+    using null (fun _ -> printfn "null")
+
+    printfn "Deferred:"
+    use _ = new MyStruct(0)
+    use _ = new MyStruct(1)
+    use _ = new MyClass(0)
+    use _ = null
+
+    printfn "Done"
+  })
