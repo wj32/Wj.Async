@@ -130,7 +130,7 @@ let testAll () =
 let testAny () =
   Dispatcher.run dispatcher (fun () -> deferred {
     let list = [never (); wait 1000; wait 100; wait 200]
-    let! ((), i) = Deferred.anyi list
+    let! (i, ()) = Deferred.anyi list
     printfn "Index %i finished first." i
     do! Deferred.allUnit (List.tail list)
   })

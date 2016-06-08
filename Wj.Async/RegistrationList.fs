@@ -73,11 +73,7 @@ module RegistrationList =
     | Initial -> swap ()
     | Singly _ ->
       let finishMoveSingly reversed replacement =
-        let rec reverseIntoSingly acc xs =
-          match xs with
-          | [] -> acc
-          | x :: rest -> reverseIntoSingly (Singly (x, acc)) rest
-        t.state <- reverseIntoSingly t.state reversed
+        t.state <- reversed |> List.fold (fun acc x -> Singly (x, acc)) t.state
         from.state <- replacement
       let rec attemptMoveSingly acc state =
         match state with

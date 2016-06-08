@@ -1,7 +1,7 @@
 ﻿namespace Wj.Async
 
-open System;
-open System.Threading.Tasks;
+open System
+open System.Threading.Tasks
 
 module Deferred =
   let [<Literal>] private DeferredNotDetermined = "The deferred result is not yet determined."
@@ -277,12 +277,18 @@ module Deferred =
       )
       v :> _ IDeferred
 
+  module Infix =
+    let (>>=) t f = bind t f
+    let (>>|) t f = map t f
+    let (>>>) t f = upon t f
+    let (>--) t node = link node t
+
+  let allUnit ts = allForget ts
+
   let both (t1 : 'a IDeferred) (t2 : 'b IDeferred) =
     let v = createVar ()
     upon t1 (fun x1 -> upon t2 (fun x2 -> set v (x1, x2)))
     v :> _ IDeferred
-
-  let allUnit ts = allForget ts
 
   let anyiMap (ts : _ IDeferred list) f =
     let dispatcher = ThreadShared.currentDispatcher ()
@@ -297,9 +303,9 @@ module Deferred =
     )
     v :> _ IDeferred
 
-  let any (ts : _ IDeferred list) = anyiMap ts (fun i x -> x)
+  let anyi (ts : _ IDeferred list) = anyiMap ts (fun i x -> (i, x))
 
-  let anyi (ts : _ IDeferred list) = anyiMap ts (fun i x -> (x, i))
+  let any (ts : _ IDeferred list) = anyiMap ts (fun i x -> x)
 
   let anyUnit (ts : _ IDeferred list) = anyiMap ts (fun i x -> ())
 
@@ -322,13 +328,6 @@ module Deferred =
     let v = createVar ()
     task.ContinueWith(Action<Task>(fun _ -> v.Set(()))) |> ignore
     v :> _ IDeferred
-
-  module Infix =
-    let (>>=) t f = bind t f
-
-    let (>>|) t f = map t f
-
-    let (>>>) t f = upon t f
 
   [<Interface>]
   type 'b IChoice =
@@ -354,10 +353,10 @@ module Deferred =
     let rec setResult (cs : _ IChoice list) =
       match cs with
       | [] -> assert false
-      | c :: rest ->
+      | c :: cs ->
         match c.TryGetApply() with
         | Some y -> set v y
-        | None -> setResult rest
+        | None -> setResult cs
     let mutable registrations = []
     registrations <- choices |> List.map (fun c ->
       c.Register(ThreadShared.currentSupervisor (), (fun () ->
@@ -385,3 +384,66 @@ module Deferred =
   let repeatForever (f : _ -> _ IDeferred) state =
     let rec loop state = upon (f state) (fun state -> loop state)
     loop state
+
+  open Infix
+
+  module List =
+    module P = Parallelism
+
+    let foldi (f : _ -> _ -> _ -> _ IDeferred) state xs =
+      match xs with
+      | [] -> value state
+      | x :: xs ->
+        let v = createNode ()
+        let rec loop i state x xs =
+          match xs with
+          | [] -> f i state x >-- v
+          | x' :: xs' -> f i state x >>> (fun state -> loop (i + 1) state x' xs')
+        loop 0 state x xs
+        v :> _ IDeferred
+
+    let fold f state xs = foldi (fun i args -> f args) state xs
+
+    let all xs = all xs
+
+    let allUnit xs = allUnit xs
+
+    let iteri p f xs =
+      match p with
+      | P.Sequential -> xs |> foldi (fun i () x -> f i x) ()
+      | P.Parallel -> xs |> List.mapi (fun i x -> f i x) |> allUnit
+
+    let iter p f xs = iteri p (fun i args -> f args) xs
+
+    let mapi p f xs =
+      match p with
+      | P.Sequential -> xs |> foldi (fun i ys x -> (f i x) >>| (fun y -> y :: ys)) [] >>| List.rev
+      | P.Parallel -> xs |> List.mapi (fun i x -> f i x) |> all
+
+    let map p f xs = mapi p (fun i args -> f args) xs
+
+    let init p length f = List.init length id |> map p f
+
+    let concatMap p f xs = map p f xs >>| List.concat
+
+    let choose p f xs = map p f xs >>| List.choose id
+
+    let filter p f xs =
+      map p f xs >>| (List.fold2 (fun acc x b -> if b then x :: acc else acc) [] xs >> List.rev)
+
+    let tryPick (f : _ -> _ option IDeferred) xs =
+      match xs with
+      | [] -> value None
+      | x :: xs ->
+        let v = createNode ()
+        let rec loop x xs =
+          match xs with
+          | [] -> f x >-- v
+          | x' :: xs'' ->
+            let d = f x
+            d >>> (fun y -> match y with Some _ -> d >-- v | None -> loop x' xs'')
+        loop x xs
+        v :> _ IDeferred
+
+    let tryFind (f : _ -> bool IDeferred) xs =
+      xs |> tryPick (fun x -> f x >>| (fun b -> if b then Some x else None))
