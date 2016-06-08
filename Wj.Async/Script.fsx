@@ -6,6 +6,7 @@
 #load "Registration.fs"
 #load "RegistrationList.fs"
 #load "CoreTypes.fs"
+#load "Parallelism.fs"
 #load "IVar.fs"
 #load "INode.fs"
 #load "ThreadShared.fs"

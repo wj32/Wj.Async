@@ -269,7 +269,7 @@ module Deferred =
       let v = createVar ()
       ts |> List.iter (fun t ->
         count <- count + 1
-        upon t (fun x ->
+        upon t (fun () ->
           completed <- completed + 1
           if completed = count then
             set v ()
@@ -387,6 +387,106 @@ module Deferred =
 
   open Infix
 
+  module Array =
+    module P = Parallelism
+
+    let foldi (f : _ -> _ -> _ -> _ IDeferred) state xs =
+      let n = Array.length xs
+      if n = 0 then
+        value state
+      else
+        let v = createNode ()
+        let rec loop i state =
+          if i = n - 1 then
+            f i state xs.[i] >-- v
+          else
+            f i state xs.[i] >>> (fun state -> loop (i + 1) state)
+        loop 0 state
+        v :> _ IDeferred
+
+    let fold f state xs = foldi (fun i args -> f args) state xs
+
+    let all (ts : _ IDeferred array) =
+      let count = Array.length ts
+      if count = 0 then
+        value Array.empty
+      else
+        let mutable completed = 0
+        let xs = Array.zeroCreate count
+        let v = createVar ()
+        ts |> Array.iteri (fun i t ->
+          upon t (fun x ->
+            xs.[i] <- x
+            completed <- completed + 1
+            if completed = count then
+              set v xs
+          )
+        )
+        v :> _ IDeferred
+
+    let allUnit (ts : unit IDeferred array) =
+      let count = Array.length ts
+      if count = 0 then
+        unit
+      else
+        let mutable completed = 0
+        let v = createVar ()
+        ts |> Array.iter (fun t ->
+          upon t (fun () ->
+            completed <- completed + 1
+            if completed = count then
+              set v ()
+          )
+        )
+        v :> _ IDeferred
+
+    let iteri p f xs =
+      match p with
+      | P.Sequential -> xs |> foldi (fun i () x -> f i x) ()
+      | P.Parallel -> xs |> Array.mapi (fun i x -> f i x) |> allUnit
+
+    let iter p f xs = iteri p (fun i args -> f args) xs
+
+    let mapi p f xs =
+      match p with
+      | P.Sequential ->
+        let ys = Array.zeroCreate (Array.length xs)
+        xs |> foldi (fun i () x -> f i x >>| (fun y -> ys.[i] <- y)) () >>| (fun () -> ys)
+      | P.Parallel -> xs |> Array.mapi (fun i x -> f i x) |> all
+
+    let map p f xs = mapi p (fun i args -> f args) xs
+
+    let init p length f = Array.init length id |> map p f
+
+    let concatMap p f xs = map p f xs >>| Array.concat
+
+    let choose p f xs = map p f xs >>| Array.choose id
+
+    let filter2 xs bs =
+      let list = new System.Collections.Generic.List<_>()
+      Array.iter2 (fun x b -> if b then list.Add(x)) xs bs
+      list.ToArray()
+
+    let filter p f xs = map p f xs >>| filter2 xs
+
+    let tryPick (f : _ -> _ option IDeferred) xs =
+      let n = Array.length xs
+      if n = 0 then
+        value None
+      else
+        let v = createNode ()
+        let rec loop i =
+          if i = n - 1 then
+            f xs.[i] >-- v
+          else
+            let d = f xs.[i]
+            d >>> (fun y -> match y with Some _ -> d >-- v | None -> loop (i + 1))
+        loop 0
+        v :> _ IDeferred
+
+    let tryFind (f : _ -> bool IDeferred) xs =
+      xs |> tryPick (fun x -> f x >>| (fun b -> if b then Some x else None))
+
   module List =
     module P = Parallelism
 
@@ -404,9 +504,9 @@ module Deferred =
 
     let fold f state xs = foldi (fun i args -> f args) state xs
 
-    let all xs = all xs
+    let all ts = all ts
 
-    let allUnit xs = allUnit xs
+    let allUnit ts = allUnit ts
 
     let iteri p f xs =
       match p with
@@ -417,7 +517,7 @@ module Deferred =
 
     let mapi p f xs =
       match p with
-      | P.Sequential -> xs |> foldi (fun i ys x -> (f i x) >>| (fun y -> y :: ys)) [] >>| List.rev
+      | P.Sequential -> xs |> foldi (fun i ys x -> f i x >>| (fun y -> y :: ys)) [] >>| List.rev
       | P.Parallel -> xs |> List.mapi (fun i x -> f i x) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
@@ -428,8 +528,9 @@ module Deferred =
 
     let choose p f xs = map p f xs >>| List.choose id
 
-    let filter p f xs =
-      map p f xs >>| (List.fold2 (fun acc x b -> if b then x :: acc else acc) [] xs >> List.rev)
+    let filter2 xs bs = List.fold2 (fun acc x b -> if b then x :: acc else acc) [] xs bs |> List.rev
+
+    let filter p f xs = map p f xs >>| filter2 xs
 
     let tryPick (f : _ -> _ option IDeferred) xs =
       match xs with
