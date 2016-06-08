@@ -81,7 +81,7 @@ module Deferred =
   val repeat : f : ('state -> Repeat.T<'state, 'a> IDeferred) -> state : 'state -> 'a IDeferred
   val repeatForever : f : ('state -> 'state IDeferred) -> state : 'state -> unit
 
-  // Monad sequences, and other monads
+  // Monad sequences
 
   module Array =
     val foldi : folder : (int -> 'state -> 'a -> 'state IDeferred) -> state : 'state -> s : 'a array -> 'state IDeferred
