@@ -10,29 +10,13 @@ type DeferredBuilder() =
 
   member this.Delay(f) = f
 
-  member this.For(xs : 'a seq, body) =
-    let e = xs.GetEnumerator()
-    if e.MoveNext() then
-      let v = Deferred.createVar ()
-      let rec loop x =
-        Deferred.upon (body x) (fun () ->
-          if e.MoveNext() then
-            loop e.Current
-          else
-            e.Dispose()
-            Deferred.set v ()
-        )
-      loop e.Current
-      v :> _ IDeferred
-    else
-      e.Dispose()
-      Deferred.unit
-
   member this.Return(x) = Deferred.value x
 
   member this.ReturnFrom(t) = t
 
   member this.Run(f) = f ()
+
+  member this.Zero() = Deferred.unit
 
   member this.TryFinally(body, finalizer) =
     Supervisor.tryFinally body (fun () -> finalizer (); Deferred.unit)
@@ -41,9 +25,11 @@ type DeferredBuilder() =
     Supervisor.tryWith body handler Supervisor.AfterDetermined.Log
 
   member this.Using(disposable : #IDisposable, body) =
+    // TODO: If disposable is a struct, it will get boxed in the check below. Find a way of handling
+    // this.
     Supervisor.tryFinally
       (fun () -> body disposable)
-      (fun () -> (match disposable with null -> () | _ -> disposable.Dispose()); Deferred.unit)
+      (fun () -> (if not (obj.ReferenceEquals(disposable, null)) then disposable.Dispose()); Deferred.unit)
 
   member this.While(guard, body) =
     if guard () then
@@ -60,4 +46,21 @@ type DeferredBuilder() =
     else
       Deferred.unit
 
-  member this.Zero() = Deferred.unit
+  member this.For(xs : _ seq, body : _ -> unit IDeferred) =
+    this.Using(
+      xs.GetEnumerator(),
+      fun e ->
+        if e.MoveNext() then
+          let v = Deferred.createVar ()
+          let rec loop x =
+            Deferred.upon (body x) (fun () ->
+              if e.MoveNext() then
+                loop e.Current
+              else
+                Deferred.set v ()
+            )
+          loop e.Current
+          v :> _ IDeferred
+        else
+          Deferred.unit
+    )
