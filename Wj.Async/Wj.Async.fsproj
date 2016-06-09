@@ -63,6 +63,8 @@
     <Compile Include="Supervisor.fs" />
     <Compile Include="Dispatcher.fsi" />
     <Compile Include="Dispatcher.fs" />
+    <Compile Include="DeferredSeq.fsi" />
+    <Compile Include="DeferredSeq.fs" />
     <Compile Include="DeferredBuilder.fs" />
     <Compile Include="Clock.fsi" />
     <Compile Include="Clock.fs" />
