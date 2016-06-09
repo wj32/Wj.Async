@@ -1,0 +1,1 @@
+This is an async library for F# with a similar interface to Jane Street's [async_kernel](https://github.com/janestreet/async_kernel) library.
