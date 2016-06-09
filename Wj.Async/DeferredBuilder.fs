@@ -47,3 +47,5 @@ type DeferredBuilder() =
       Deferred.unit
 
   member this.For(xs, body) = Deferred.Seq.iter Parallelism.Sequential body xs
+
+  member this.For(xs, body) = DeferredSeq.iter body xs

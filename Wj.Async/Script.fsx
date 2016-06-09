@@ -13,6 +13,7 @@
 #load "Deferred.fs"
 #load "Supervisor.fs"
 #load "Dispatcher.fs"
+#load "DeferredSeq.fs"
 #load "DeferredBuilder.fs"
 #load "Clock.fs"
 #load "Operators.fs"

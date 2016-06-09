@@ -270,16 +270,12 @@ module Deferred =
         let mutable writer = Some reader
         t.UponException(fun ex ->
           match writer with
-          | Some _ ->
-            writer <- None
-            upon (finalizer ()) (fun () -> raise ex)
+          | Some _ -> writer <- None; upon (finalizer ()) (fun () -> raise ex)
           | None -> raise ex
         )
         upon d (fun x ->
           match writer with
-          | Some v ->
-            writer <- None
-            upon (finalizer ()) (fun () -> set v x)
+          | Some v -> writer <- None; upon (finalizer ()) (fun () -> set v x)
           | None -> ()
         )
         reader :> _ IDeferred
@@ -352,8 +348,7 @@ module Deferred =
   let repeat (f : _ -> Repeat.T<_, _> IDeferred) state =
     let v = createVar ()
     let rec loop state =
-      f state >>> (fun r ->
-        match r with
+      f state >>> (function
         | Repeat.Repeat state -> loop state
         | Repeat.Done x -> x --> v
       )
@@ -482,8 +477,7 @@ module Deferred =
         let rec loop x xs =
           match xs with
           | [] -> f x >-- v
-          | x' :: xs'' ->
-            f x >>> (fun y -> match y with Some _ -> y --> v | None -> loop x' xs'')
+          | x' :: xs'' -> f x >>> (fun y -> match y with Some _ -> y --> v | None -> loop x' xs'')
         loop x xs
         v :> _ IDeferred
 

@@ -9,23 +9,26 @@ module DeferredSeq =
   // Writer
 
   module Writer =
+    type 'a DS = 'a T
     type 'a T
 
+    val create : unit -> 'a T
     val isClosed : 'a T -> bool
     val close : 'a T -> unit
     val write : 'a T -> value : 'a -> unit
+    val read : 'a T -> 'a DS
 
-  val create : unit -> 'a T * 'a Writer.T
+  val create : f : ('a Writer.T -> unit) -> 'a T
   val empty : unit -> 'a T
 
   // General
 
-  val foldi : folder : (int -> 'state -> 'a -> 'state IDeferred) -> state : 'state -> s : 'a T -> 'state IDeferred
-  val fold : folder : ('state -> 'a -> 'state IDeferred) -> state : 'state -> s : 'a T -> 'state IDeferred
-  val iteri : action : (int -> 'a -> unit IDeferred) -> s : 'a T -> unit IDeferred
-  val iter : action : ('a -> unit IDeferred) -> s : 'a T -> unit IDeferred
-  val mapi : mapping : (int -> 'a -> 'b IDeferred) -> s : 'a T -> 'b T
-  val map : mapping : ('a -> 'b IDeferred) -> s : 'a T -> 'b T
+  val fold' : folder : ('state -> 'a -> 'state IDeferred) -> state : 'state -> s : 'a T -> 'state IDeferred
+  val fold : folder : ('state -> 'a -> 'state) -> state : 'state -> s : 'a T -> 'state IDeferred
+  val iter' : action : ('a -> unit IDeferred) -> s : 'a T -> unit IDeferred
+  val iter : action : ('a -> unit) -> s : 'a T -> unit IDeferred
+  val map' : mapping : ('a -> 'b IDeferred) -> s : 'a T -> 'b T
+  val map : mapping : ('a -> 'b) -> s : 'a T -> 'b T
   val init : length : int -> initializer : (int -> 'a IDeferred) -> 'a T
   val concatMap : mapping : ('a -> 'b T) -> s : 'a T -> 'b T
   val choose : chooser : ('a -> 'b option IDeferred) -> s : 'a T -> 'b T
@@ -35,9 +38,10 @@ module DeferredSeq =
 
   val first : s : 'a T -> 'a IDeferred
   val tryFirst : s : 'a T -> 'a option IDeferred
+  val length : s : 'a T -> int IDeferred
   val concat : ss : 'a T T -> 'a T
   val append : s1 : 'a T -> s2 : 'a T -> 'a T
-  val interleave : 'a T T -> 'a T
+  val interleave : ss : 'a T T -> 'a T
   val take : count : int -> s : 'a T -> 'a T
   val takeDetermined : s : 'a T -> 'a seq * 'a T
   val takeUntil : event : unit IDeferred -> s : 'a T -> 'a T
