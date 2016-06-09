@@ -25,6 +25,30 @@ module Deferred =
   let enqueue (supervisor : ISupervisor) f x =
     supervisor.Dispatcher.Enqueue((supervisor, fun () -> f x))
 
+  module private Never =
+    [<ReferenceEquality>]
+    type 'a T =
+      | Never
+
+      interface 'a IDeferred with
+        member t.Upon(f : 'a -> unit) = ()
+
+        member t.Upon(supervisedCallback : 'a SupervisedCallback) = ()
+
+        member t.Register(f : 'a -> unit) = Registration.empty
+
+        member t.Register(supervisedCallback : 'a SupervisedCallback) = Registration.empty
+
+        member t.MoveFrom(from) = RegistrationList.clear from
+
+        member t.IsDetermined = false
+
+        member t.Get() = invalidOp DeferredNotDetermined
+
+        member t.TryGet() = None
+
+    let create () = Never
+
   module private Var =
     [<ReferenceEquality>]
     type 'a State =
@@ -42,11 +66,16 @@ module Deferred =
       {mutable state : 'a State}
 
       static member private FindRoot (d : 'a IDeferred) =
-        let rec findRoot (d : 'a IDeferred) =
+        let rec findRoot original (d : 'a IDeferred) =
           match d with
           | :? ('a T) as t ->
             match t.state with
-            | Linked parent -> findRoot parent
+            | Linked parent ->
+              if obj.ReferenceEquals(parent, original) then
+                // Cycle detected!
+                original
+              else
+                findRoot original parent
             | _ -> d
           | _ -> d
         let rec updateParent (d : 'a IDeferred) root =
@@ -62,7 +91,7 @@ module Deferred =
         | :? ('a T) as t ->
           match t.state with
           | Linked parent ->
-            let root = findRoot parent
+            let root = findRoot d parent
             updateParent t root
             root
           | _ -> d
@@ -132,10 +161,13 @@ module Deferred =
         member t.TryLink(parent) =
           match t.state with
           | Pending callbacks ->
-            // moveFrom parent callbacks does the same thing, but this should be slightly faster.
             let root = T<'a>.FindRoot(parent)
-            t.state <- Linked root
-            moveFrom root callbacks
+            if obj.ReferenceEquals(root, t) then
+              // This is a cycle.
+              t.state <- Linked (Never.create ())
+            else
+              t.state <- Linked root
+              moveFrom root callbacks
             true
           | _ -> false
 
@@ -144,30 +176,6 @@ module Deferred =
     let createLinked d = {state = Linked d}
 
     let createValue x = {state = Value x}
-
-  module private Never =
-    [<ReferenceEquality>]
-    type 'a T =
-      | Never
-
-      interface 'a IDeferred with
-        member t.Upon(f : 'a -> unit) = ()
-
-        member t.Upon(supervisedCallback : 'a SupervisedCallback) = ()
-
-        member t.Register(f : 'a -> unit) = Registration.empty
-
-        member t.Register(supervisedCallback : 'a SupervisedCallback) = Registration.empty
-
-        member t.MoveFrom(from) = RegistrationList.clear from
-
-        member t.IsDetermined = false
-
-        member t.Get() = invalidOp DeferredNotDetermined
-
-        member t.TryGet() = None
-
-    let create () = Never
 
   let value x = Var.createValue x :> _ IDeferred
 

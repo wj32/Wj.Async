@@ -177,8 +177,8 @@ let testChoice () =
     let v2 = Deferred.createVar ()
     dontWaitFor (deferred {
       do! afterMs 100
-      Deferred.set v2 ()
-      Deferred.set v1 ()
+      () --> v2
+      () --> v1
     })
     do!
       choose
@@ -236,4 +236,23 @@ let testSequenceFunctions () =
     printfn "Array tryFind: %A" three
     let! nothing = config |> Deferred.Array.tryFind (fun c -> c ||> waitAndReturn >>| ((=) 99))
     printfn "Array tryFind: %A" nothing
+  })
+
+let testCycle () =
+  Dispatcher.run dispatcher (fun () -> deferred {
+    let v1 = Deferred.createVar ()
+    let v2 = Deferred.createVar ()
+    v1 >-- v2
+    v2 >-- v1
+    do! Deferred.anyUnit [v1; v2; afterMs 1000]
+    printfn "Waited 1 second - detected cycle!"
+
+    let v1 = Deferred.createVar ()
+    let v2 = Deferred.createVar ()
+    let v3 = Deferred.createVar ()
+    v1 >-- v2
+    v2 >-- v3
+    v3 >-- v1
+    do! Deferred.anyUnit [v1; v2; v3; afterMs 1000]
+    printfn "Waited 1 second - detected cycle!"
   })
