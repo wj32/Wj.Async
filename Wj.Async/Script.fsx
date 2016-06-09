@@ -122,7 +122,7 @@ let testExceptions () =
 
 let testFor () =
   Dispatcher.run dispatcher (fun () -> deferred {
-    for i in 1 .. 10 do
+    for i in System.Linq.Enumerable.Range(1, 10) do
       do! afterMs 100
       for j in 1 .. 5 do
         printfn "(%d, %d)" i j
@@ -236,6 +236,11 @@ let testSequenceFunctions () =
     printfn "Array tryFind: %A" three
     let! nothing = config |> Deferred.Array.tryFind (fun c -> c ||> waitAndReturn >>| ((=) 99))
     printfn "Array tryFind: %A" nothing
+
+    let! three = (config |> Seq.skip 1) |> Deferred.Seq.tryFind (fun c -> c ||> waitAndReturn >>| ((=) 5))
+    printfn "Seq tryFind: %A" three
+    let! nothing = (config |> Seq.skip 1) |> Deferred.Seq.tryFind (fun c -> c ||> waitAndReturn >>| ((=) 99))
+    printfn "Seq tryFind: %A" nothing
   })
 
 let testCycle () =

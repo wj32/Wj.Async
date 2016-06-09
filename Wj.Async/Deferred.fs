@@ -500,17 +500,14 @@ module Deferred =
       | _ ->
         let e = xs.GetEnumerator()
         tryFinally (fun () ->
-          if e.MoveNext() then
-            let v = createVar ()
-            let rec loop i state x =
-              if e.MoveNext() then
-                f i state x >>> (fun state -> loop (i + 1) state e.Current)
-              else
-                f i state x >-- v
-            loop 0 state e.Current
-            v :> _ IDeferred
-          else
-            value state
+          let v = createVar ()
+          let rec loop i state =
+            if e.MoveNext() then
+              f i state e.Current >>> (fun state -> loop (i + 1) state)
+            else
+              state --> v
+          loop 0 state
+          v :> _ IDeferred
         ) (fun () -> e.Dispose(); unit)
 
     let fold f state xs = foldi (fun i args -> f args) state xs
@@ -568,17 +565,14 @@ module Deferred =
       | _ ->
         let e = xs.GetEnumerator()
         tryFinally (fun () ->
-          if e.MoveNext() then
-            let v = createVar ()
-            let rec loop x =
-              if e.MoveNext() then
-                f x >>> (fun y -> match y with Some _ -> y --> v | None -> loop e.Current)
-              else
-                f x >-- v
-            loop e.Current
-            v :> _ IDeferred
-          else
-            value None
+          let v = createVar ()
+          let rec loop () =
+            if e.MoveNext() then
+              f e.Current >>> (fun y -> match y with Some _ -> y --> v | None -> loop ())
+            else
+              None --> v
+          loop ()
+          v :> _ IDeferred
         ) (fun () -> e.Dispose(); unit)
 
     let tryFind (f : _ -> bool IDeferred) xs =
