@@ -470,7 +470,7 @@ module Deferred =
 
     let choose p f xs = map p f xs >>| List.choose id
 
-    let filter2 xs bs = List.fold2 (fun acc x b -> if b then x :: acc else acc) [] xs bs |> List.rev
+    let filter2 xs bs = List.foldBack2 (fun x b acc -> if b then x :: acc else acc) xs bs []
 
     let filter p f xs = map p f xs >>| filter2 xs
 
