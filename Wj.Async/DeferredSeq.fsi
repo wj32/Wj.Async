@@ -30,7 +30,7 @@ module DeferredSeq =
   val map' : mapping : ('a -> 'b IDeferred) -> s : 'a T -> 'b T
   val map : mapping : ('a -> 'b) -> s : 'a T -> 'b T
   val init : length : int -> initializer : (int -> 'a IDeferred) -> 'a T
-  val concatMap : mapping : ('a -> 'b T) -> s : 'a T -> 'b T
+  val collect : mapping : ('a -> 'b T) -> s : 'a T -> 'b T
   val choose : chooser : ('a -> 'b option IDeferred) -> s : 'a T -> 'b T
   val filter : predicate : ('a -> bool IDeferred) -> s : 'a T -> 'a T
   val tryPick : chooser : ('a -> 'b option IDeferred) -> s : 'a T -> 'b option IDeferred

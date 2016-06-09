@@ -78,7 +78,7 @@ module DeferredSeq =
       loop 0
     )
 
-  let concatMap (f : _ -> _ T) xs =
+  let collect (f : _ -> _ T) xs =
     xs |> createIter' (fun write x -> f x |> iter (fun y -> write y))
 
   let choose (f : _ -> _ IDeferred) xs =
