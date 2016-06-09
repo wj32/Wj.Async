@@ -16,6 +16,7 @@ module DeferredSeq =
     val write : 'a T -> value : 'a -> unit
 
   val create : unit -> 'a T * 'a Writer.T
+  val empty : unit -> 'a T
 
   // General
 
@@ -27,15 +28,19 @@ module DeferredSeq =
   val map : mapping : ('a -> 'b IDeferred) -> s : 'a T -> 'b T
   val init : length : int -> initializer : (int -> 'a IDeferred) -> 'a T
   val concatMap : mapping : ('a -> 'b T) -> s : 'a T -> 'b T
-  val choose : chooser : ('a -> 'b option IDeferred) -> s : 'a T -> 'b T IDeferred
-  val filter : predicate : ('a -> bool IDeferred) -> s : 'a T -> 'a T IDeferred
+  val choose : chooser : ('a -> 'b option IDeferred) -> s : 'a T -> 'b T
+  val filter : predicate : ('a -> bool IDeferred) -> s : 'a T -> 'a T
   val tryPick : chooser : ('a -> 'b option IDeferred) -> s : 'a T -> 'b option IDeferred
   val tryFind : predicate : ('a -> bool IDeferred) -> s : 'a T -> 'a option IDeferred
 
-  val first : 'a T -> 'a IDeferred
-  val tryFirst : 'a T -> 'a option IDeferred
-  val concat : 'a T T -> 'a T
+  val first : s : 'a T -> 'a IDeferred
+  val tryFirst : s : 'a T -> 'a option IDeferred
+  val concat : ss : 'a T T -> 'a T
   val append : s1 : 'a T -> s2 : 'a T -> 'a T
+  val interleave : 'a T T -> 'a T
+  val take : count : int -> s : 'a T -> 'a T
+  val takeDetermined : s : 'a T -> 'a seq * 'a T
+  val takeUntil : event : unit IDeferred -> s : 'a T -> 'a T
 
   val ofArray : 'a array -> 'a T
   val toArray : 'a T -> 'a array IDeferred

@@ -42,3 +42,5 @@ module DeferredSeq =
         t.state <- Tail tail'
 
   let create () = Writer.createTail ()
+
+  let empty () = Deferred.value Empty
