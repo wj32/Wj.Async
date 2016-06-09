@@ -13,16 +13,13 @@ module Deferred =
   // IVar functions
   val set : 'a IVar -> value : 'a -> unit
   val trySet : 'a IVar -> value : 'a -> bool
-  // INode functions
-  val isLinked : 'a INode -> bool
-  val link : 'a INode -> parent : 'a IDeferred -> unit
-  val tryLink : 'a INode -> parent : 'a IDeferred -> bool
+  val link : 'a IVar -> parent : 'a IDeferred -> unit
+  val tryLink : 'a IVar -> parent : 'a IDeferred -> bool
 
   // Creation
 
   val value : value : 'a -> 'a IDeferred
   val createVar : unit -> 'a IVar
-  val createNode : unit -> 'a INode
   val unit : unit IDeferred
   val never : unit -> 'a IDeferred
 
@@ -42,7 +39,8 @@ module Deferred =
     val (>>=) : 'a IDeferred -> ('a -> 'b IDeferred) -> 'b IDeferred
     val (>>|) : 'a IDeferred -> ('a -> 'b) -> 'b IDeferred
     val (>>>) : 'a IDeferred -> ('a -> unit) -> unit
-    val (>--) : 'a IDeferred -> 'a INode -> unit
+    val (-->) : 'a -> 'a IVar -> unit
+    val (>--) : 'a IDeferred -> 'a IVar -> unit
 
   // General
 

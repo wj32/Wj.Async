@@ -82,19 +82,20 @@ module Supervisor =
         d
       else
         let dispatcher = ThreadShared.currentDispatcher ()
-        let reader = Deferred.createNode ()
+        let reader = Deferred.createVar ()
         let mutable writer = Some reader
-        let write v d =
-          writer <- None
-          Deferred.link v d
         uponException t (fun ex ->
           match writer with
-          | Some v -> write v (handler ex)
+          | Some v ->
+            writer <- None
+            Deferred.link v (handler ex)
           | None -> handleAfterDetermined afterDetermined ex
         )
         Deferred.upon' d (dispatcher.RootSupervisor, (fun x ->
           match writer with
-          | Some v -> write v d
+          | Some v ->
+            writer <- None
+            Deferred.set v x
           | None -> ()
         ))
         reader :> _ IDeferred

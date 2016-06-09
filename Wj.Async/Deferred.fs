@@ -5,8 +5,7 @@ open System.Threading.Tasks
 
 module Deferred =
   let [<Literal>] private DeferredNotDetermined = "The deferred result is not yet determined."
-  let [<Literal>] private VarAlreadySet = "The variable is already set."
-  let [<Literal>] private NodeAlreadyLinked = "The node has already been joined."
+  let [<Literal>] private VarAlreadySetOrLinked = "The variable is already set or linked."
 
   // IDeferred functions
   let upon (t : _ IDeferred) (f : _ -> unit) = t.Upon(f)
@@ -20,10 +19,8 @@ module Deferred =
   // IVar functions
   let set (t : _ IVar) x = t.Set(x)
   let trySet (t : _ IVar) x = t.TrySet(x)
-  // INode functions
-  let isLinked (t : _ INode) = t.IsLinked
-  let link (t : _ INode) d = t.Link(d)
-  let tryLink (t : _ INode) d = t.TryLink(d)
+  let link (t : _ IVar) d = t.Link(d)
+  let tryLink (t : _ IVar) d = t.TryLink(d)
 
   let enqueue (supervisor : ISupervisor) f x =
     supervisor.Dispatcher.Enqueue((supervisor, fun () -> f x))
@@ -31,12 +28,45 @@ module Deferred =
   module private Var =
     [<ReferenceEquality>]
     type 'a State =
+      /// The Var is not linked and does not have a value.
       | Pending of callbacks : 'a SupervisedCallback RegistrationList.T
-      | Done of value : 'a
+      /// The Var is set to a value.
+      | Value of value : 'a
+      /// The Var is linked to a parent IDeferred.
+      /// Due to FindRoot, the parent will always be a Pending, Value or not a Var.T at all (but
+      /// never a Linked).
+      | Linked of parent : 'a IDeferred
 
     [<ReferenceEquality>]
     type 'a T =
       {mutable state : 'a State}
+
+      static member private FindRoot (d : 'a IDeferred) =
+        let rec findRoot (d : 'a IDeferred) =
+          match d with
+          | :? ('a T) as t ->
+            match t.state with
+            | Linked parent -> findRoot parent
+            | _ -> d
+          | _ -> d
+        let rec updateParent (d : 'a IDeferred) root =
+          match d with
+          | :? ('a T) as t ->
+            match t.state with
+            | Linked parent ->
+              t.state <- Linked root
+              updateParent parent root
+            | _ -> ()
+          | _ -> ()
+        match d with
+        | :? ('a T) as t ->
+          match t.state with
+          | Linked parent ->
+            let root = findRoot parent
+            updateParent t root
+            root
+          | _ -> d
+        | _ -> d
 
       interface 'a IDeferred with
         member t.Upon(f) = (t :> _ IDeferred).Upon((ThreadShared.currentSupervisor (), f))
@@ -44,54 +74,76 @@ module Deferred =
         member t.Upon((supervisor, f) as supervisedCallback) =
           match t.state with
           | Pending callbacks -> RegistrationList.add callbacks supervisedCallback
-          | Done x -> enqueue supervisor f x
+          | Value x -> enqueue supervisor f x
+          | Linked parent -> upon' (T<'a>.FindRoot(parent)) supervisedCallback
 
         member t.Register(f) = (t :> _ IDeferred).Register((ThreadShared.currentSupervisor (), f))
 
         member t.Register((supervisor, f) as supervisedCallback) =
           match t.state with
           | Pending callbacks -> RegistrationList.register callbacks supervisedCallback
-          | Done x -> enqueue supervisor f x; Registration.empty
+          | Value x -> enqueue supervisor f x; Registration.empty
+          | Linked parent -> register' (T<'a>.FindRoot(parent)) supervisedCallback
 
         member t.MoveFrom(from) =
           match t.state with
           | Pending callbacks -> RegistrationList.moveFrom callbacks from
-          | Done x ->
+          | Value x ->
             RegistrationList.toList from
             |> List.iter (fun (supervisor, f) -> enqueue supervisor f x)
+          | Linked parent -> moveFrom (T<'a>.FindRoot(parent)) from
 
         member t.IsDetermined =
           match t.state with
           | Pending _ -> false
-          | Done _ -> true
+          | Value _ -> true
+          | Linked parent -> isDetermined (T<'a>.FindRoot(parent))
 
         member t.Get() =
           match t.state with
           | Pending _ -> invalidOp DeferredNotDetermined
-          | Done x -> x
+          | Value x -> x
+          | Linked parent -> get (T<'a>.FindRoot(parent))
 
         member t.TryGet() =
           match t.state with
           | Pending _ -> None
-          | Done x -> Some x
+          | Value x -> Some x
+          | Linked parent -> tryGet (T<'a>.FindRoot(parent))
 
       interface 'a IVar with
         member t.Set(x) =
           if not ((t :> 'a IVar).TrySet(x)) then
-            invalidOp VarAlreadySet
+            invalidOp VarAlreadySetOrLinked
 
         member t.TrySet(x) =
           match t.state with
           | Pending callbacks ->
-            t.state <- Done x
+            t.state <- Value x
             RegistrationList.toList callbacks
             |> List.iter (fun (supervisor, f) -> enqueue supervisor f x)
             true
-          | Done _ -> false
+          | _ -> false
+
+        member t.Link(parent) =
+          if not ((t :> _ IVar).TryLink(parent)) then
+            invalidOp VarAlreadySetOrLinked
+
+        member t.TryLink(parent) =
+          match t.state with
+          | Pending callbacks ->
+            // moveFrom parent callbacks does the same thing, but this should be slightly faster.
+            let root = T<'a>.FindRoot(parent)
+            t.state <- Linked root
+            moveFrom root callbacks
+            true
+          | _ -> false
 
     let createPending () = {state = Pending (RegistrationList.create ())}
 
-    let createDone x = {state = Done x}
+    let createLinked d = {state = Linked d}
+
+    let createValue x = {state = Value x}
 
   module private Never =
     [<ReferenceEquality>]
@@ -117,109 +169,9 @@ module Deferred =
 
     let create () = Never
 
-  module private Node =
-    [<ReferenceEquality>]
-    type 'a State =
-      /// The node has no parent.
-      | Unlinked of callbacks : 'a SupervisedCallback RegistrationList.T
-      /// The node has a parent IDeferred.
-      /// Due to FindRoot, the parent will always be an Unlinked or not a Node.T at all (but never a
-      /// Linked).
-      | Linked of parent : 'a IDeferred
-
-    [<ReferenceEquality>]
-    type 'a T =
-      { mutable state : 'a State; }
-
-      static member private FindRoot (d : 'a IDeferred) =
-        let rec findRoot (d : 'a IDeferred) =
-          match d with
-          | :? ('a T) as t ->
-            match t.state with
-            | Unlinked _ -> d
-            | Linked parent -> findRoot parent
-          | _ -> d
-        let rec updateParent (d : 'a IDeferred) root =
-          match d with
-          | :? ('a T) as t ->
-            match t.state with
-            | Unlinked _ -> ()
-            | Linked parent ->
-              t.state <- Linked root
-              updateParent parent root
-          | _ -> ()
-        match d with
-        | :? ('a T) as t ->
-          match t.state with
-          | Unlinked _ -> d
-          | Linked parent ->
-            let root = findRoot parent
-            updateParent t root
-            root
-        | _ -> d
-
-      interface 'a IDeferred with
-        member t.Upon(f) = (t :> _ IDeferred).Upon((ThreadShared.currentSupervisor (), f))
-
-        member t.Upon(supervisedCallback) =
-          match t.state with
-          | Unlinked callbacks -> RegistrationList.add callbacks supervisedCallback
-          | Linked parent -> upon' (T<'a>.FindRoot(parent)) supervisedCallback
-
-        member t.Register(f) = (t :> _ IDeferred).Register((ThreadShared.currentSupervisor (), f))
-
-        member t.Register(supervisedCallback) =
-          match t.state with
-          | Unlinked callbacks -> RegistrationList.register callbacks supervisedCallback
-          | Linked parent -> register' (T<'a>.FindRoot(parent)) supervisedCallback
-
-        member t.MoveFrom(from) =
-          match t.state with
-          | Unlinked callbacks -> RegistrationList.moveFrom callbacks from
-          | Linked parent -> moveFrom (T<'a>.FindRoot(parent)) from
-
-        member t.IsDetermined =
-          match t.state with
-          | Unlinked _ -> false
-          | Linked parent -> isDetermined (T<'a>.FindRoot(parent))
-
-        member t.Get() =
-          match t.state with
-          | Unlinked _ -> invalidOp DeferredNotDetermined
-          | Linked parent -> get (T<'a>.FindRoot(parent))
-
-        member t.TryGet() =
-          match t.state with
-          | Unlinked _ -> None
-          | Linked parent -> tryGet (T<'a>.FindRoot(parent))
-
-      interface 'a INode with
-        member t.IsLinked =
-          match t.state with
-          | Unlinked _ -> false
-          | Linked _ -> true
-
-        member t.Link(parent) =
-          if not ((t :> _ INode).TryLink(parent)) then
-            invalidOp NodeAlreadyLinked
-
-        member t.TryLink(parent) =
-          match t.state with
-          | Unlinked callbacks ->
-            // moveFrom parent callbacks does the same thing, but this should be slightly faster.
-            let root = T<'a>.FindRoot(parent)
-            moveFrom root callbacks
-            t.state <- Linked root
-            true
-          | Linked _ -> false
-
-    let create () = {state = Unlinked (RegistrationList.create ())}
-
-  let value x = Var.createDone x :> _ IDeferred
+  let value x = Var.createValue x :> _ IDeferred
 
   let createVar () = Var.createPending () :> _ IVar
-
-  let createNode () = Node.create () :> _ INode
 
   let unit = value ()
 
@@ -228,7 +180,7 @@ module Deferred =
   let ``return`` x = value x
 
   let bind t (f : _ -> _ IDeferred) =
-    let v = createNode ()
+    let v = createVar ()
     upon t (fun x -> link v (f x))
     v :> _ IDeferred
 
@@ -245,7 +197,7 @@ module Deferred =
     match xs with
     | [] -> value state
     | x :: xs ->
-      let v = createNode ()
+      let v = createVar ()
       let rec loop i state x xs =
         match xs with
         | [] -> link v (f i state x)
@@ -264,7 +216,8 @@ module Deferred =
     let (>>=) t f = bind t f
     let (>>|) t f = map t f
     let (>>>) t f = upon t f
-    let (>--) t node = link node t
+    let (-->) value var = set var value
+    let (>--) d var = link var d
 
   let allUnit ts = allForget ts
 
@@ -345,6 +298,8 @@ module Deferred =
     task.ContinueWith(Action<Task>(fun _ -> v.Set(()))) |> ignore
     v :> _ IDeferred
 
+  open Infix
+
   [<Interface>]
   type 'b IChoice =
     abstract member Register : supervisedCallback : unit SupervisedCallback -> IRegistration
@@ -371,7 +326,7 @@ module Deferred =
       | [] -> assert false
       | c :: cs ->
         match c.TryGetApply() with
-        | Some y -> set v y
+        | Some y -> y --> v
         | None -> setResult cs
     let mutable registrations = []
     registrations <- choices |> List.map (fun c ->
@@ -389,19 +344,17 @@ module Deferred =
   let repeat (f : _ -> Repeat.T<_, _> IDeferred) state =
     let v = createVar ()
     let rec loop state =
-      upon (f state) (fun r ->
+      f state >>> (fun r ->
         match r with
         | Repeat.Repeat state -> loop state
-        | Repeat.Done x -> set v x
+        | Repeat.Done x -> x --> v
       )
     loop state
     v :> _ IDeferred
 
   let repeatForever (f : _ -> _ IDeferred) state =
-    let rec loop state = upon (f state) (fun state -> loop state)
+    let rec loop state = f state >>> (fun state -> loop state)
     loop state
-
-  open Infix
 
   module Array =
     module P = Parallelism
@@ -411,7 +364,7 @@ module Deferred =
       if n = 0 then
         value state
       else
-        let v = createNode ()
+        let v = createVar ()
         let rec loop i state =
           if i = n - 1 then
             f i state xs.[i] >-- v
@@ -466,13 +419,12 @@ module Deferred =
       if n = 0 then
         value None
       else
-        let v = createNode ()
+        let v = createVar ()
         let rec loop i =
           if i = n - 1 then
             f xs.[i] >-- v
           else
-            let d = f xs.[i]
-            d >>> (fun y -> match y with Some _ -> d >-- v | None -> loop (i + 1))
+            f xs.[i] >>> (fun y -> match y with Some _ -> y --> v | None -> loop (i + 1))
         loop 0
         v :> _ IDeferred
 
@@ -518,13 +470,12 @@ module Deferred =
       match xs with
       | [] -> value None
       | x :: xs ->
-        let v = createNode ()
+        let v = createVar ()
         let rec loop x xs =
           match xs with
           | [] -> f x >-- v
           | x' :: xs'' ->
-            let d = f x
-            d >>> (fun y -> match y with Some _ -> d >-- v | None -> loop x' xs'')
+            f x >>> (fun y -> match y with Some _ -> y --> v | None -> loop x' xs'')
         loop x xs
         v :> _ IDeferred
 
@@ -542,7 +493,7 @@ module Deferred =
         let e = xs.GetEnumerator()
         tryFinally (fun () ->
           if e.MoveNext() then
-            let v = createNode ()
+            let v = createVar ()
             let rec loop i state x =
               if e.MoveNext() then
                 f i state x >>> (fun state -> loop (i + 1) state e.Current)
@@ -610,11 +561,10 @@ module Deferred =
         let e = xs.GetEnumerator()
         tryFinally (fun () ->
           if e.MoveNext() then
-            let v = createNode ()
+            let v = createVar ()
             let rec loop x =
               if e.MoveNext() then
-                let d = f x
-                d >>> (fun y -> match y with Some _ -> d >-- v | None -> loop e.Current)
+                f x >>> (fun y -> match y with Some _ -> y --> v | None -> loop e.Current)
               else
                 f x >-- v
             loop e.Current
