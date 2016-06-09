@@ -9,4 +9,5 @@ module RegistrationList =
   val moveFrom : 'a T -> from : 'a T -> unit
   val clear : 'a T -> unit
 
+  val ofList : 'a list -> 'a T
   val toList : 'a T -> 'a list

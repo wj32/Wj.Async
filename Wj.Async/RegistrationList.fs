@@ -95,6 +95,8 @@ module RegistrationList =
 
   let clear t = t.state <- Initial
 
+  let ofList list = {state = List.foldBack (fun x acc -> Singly (x, acc)) list Initial}
+
   let toList t =
     let rec loop acc state =
       match state with
