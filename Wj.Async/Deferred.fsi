@@ -121,7 +121,7 @@ module Deferred =
     val mapi : parallelism : Parallelism.T -> mapping : (int -> 'a -> 'b IDeferred) -> s : 'a seq -> 'b seq IDeferred
     val map : parallelism : Parallelism.T -> mapping : ('a -> 'b IDeferred) -> s : 'a seq -> 'b seq IDeferred
     val init : parallelism : Parallelism.T -> length : int -> initializer : (int -> 'a IDeferred) -> 'a seq IDeferred
-    val collect : parallelism : Parallelism.T -> mapping : ('a -> 'b seq IDeferred) -> s : 'a seq -> 'b seq IDeferred
+    val collect : parallelism : Parallelism.T -> mapping : ('a -> IDeferred<#seq<'b>>) -> s : 'a seq -> 'b seq IDeferred
     val choose : parallelism : Parallelism.T -> chooser : ('a -> 'b option IDeferred) -> s : 'a seq -> 'b seq IDeferred
     val filter : parallelism : Parallelism.T -> predicate : ('a -> bool IDeferred) -> s : 'a seq -> 'a seq IDeferred
     val tryPick : chooser : ('a -> 'b option IDeferred) -> s : 'a seq -> 'b option IDeferred

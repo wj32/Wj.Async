@@ -541,7 +541,7 @@ module Deferred =
 
     let init p length f = Seq.init length id |> map p f
 
-    let collect p (f : _ -> _ seq IDeferred) xs = map p f xs >>| Seq.concat
+    let collect p f xs = map p f xs >>| Seq.concat
 
     let choose p f xs = map p f xs >>| Seq.choose id
 
