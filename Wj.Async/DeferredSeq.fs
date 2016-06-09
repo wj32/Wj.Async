@@ -13,7 +13,7 @@ module DeferredSeq =
   module Writer =
     let [<Literal>] private WriterAlreadyClosed = "The writer is already closed."
 
-    type 'a DS = 'a T
+    type 'a DSeq = 'a T
 
     type 'a T = {mutable next : 'a Next IVar}
 
@@ -25,7 +25,8 @@ module DeferredSeq =
 
     let write t x =
       let next' = Deferred.createVar ()
-      Cons (x, next') --> t.next
+      if not (Deferred.trySet t.next (Cons (x, next'))) then
+        invalidOp WriterAlreadyClosed
       t.next <- next'
 
     let read t = t.next :> _ IDeferred

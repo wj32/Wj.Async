@@ -52,6 +52,9 @@ module Supervisor =
 
   let createRoot dispatcher = Root.create dispatcher :> ISupervisor
 
+  let getExceptionDSeq t =
+    DeferredSeq.create (fun writer -> uponException t (DeferredSeq.Writer.write writer))
+
   let supervise (f : unit -> _ IDeferred) observer =
     let t = createNamed "Supervisor.supervise"
     uponException t observer

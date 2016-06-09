@@ -18,6 +18,8 @@ module Supervisor =
   val createNamed : name : string -> ISupervisor
   val createRoot : IDispatcher -> ISupervisor
 
+  val getExceptionDSeq : ISupervisor -> exn DeferredSeq.T
+
   val supervise
     : f : (unit -> 'a IDeferred)
     -> observer : (exn -> unit)

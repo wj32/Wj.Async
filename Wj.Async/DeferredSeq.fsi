@@ -9,14 +9,14 @@ module DeferredSeq =
   // Writer
 
   module Writer =
-    type 'a DS = 'a T
+    type 'a DSeq = 'a T
     type 'a T
 
     val create : unit -> 'a T
     val isClosed : 'a T -> bool
     val close : 'a T -> unit
     val write : 'a T -> value : 'a -> unit
-    val read : 'a T -> 'a DS
+    val read : 'a T -> 'a DSeq
 
   val create : f : ('a Writer.T -> unit) -> 'a T
   val empty : unit -> 'a T
