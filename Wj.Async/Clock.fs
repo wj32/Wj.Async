@@ -4,8 +4,8 @@ open System
 open System.Threading
 
 module Clock =
-  let [<Literal>] private SpanCannotBeNegative = "The time span value cannot be negative."
-  let [<Literal>] private TimeCannotBePast = "The time span value cannot be negative."
+  let [<Literal>] SpanCannotBeNegative = "The time span value cannot be negative."
+  let [<Literal>] TimeCannotBePast = "The time span value cannot be negative."
 
   let afterTimer create =
     let v = Deferred.createVar ()

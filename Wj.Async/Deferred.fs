@@ -4,8 +4,8 @@ open System
 open System.Threading.Tasks
 
 module Deferred =
-  let [<Literal>] private DeferredNotDetermined = "The deferred result is not yet determined."
-  let [<Literal>] private VarAlreadySetOrLinked = "The variable is already set or linked."
+  let [<Literal>] DeferredNotDetermined = "The deferred result is not yet determined."
+  let [<Literal>] VarAlreadySetOrLinked = "The variable is already set or linked."
 
   // IDeferred functions
   let upon (t : _ IDeferred) (f : _ -> unit) = t.Upon(f)
@@ -25,7 +25,7 @@ module Deferred =
   let enqueue (supervisor : ISupervisor) f x =
     supervisor.Dispatcher.Enqueue((supervisor, fun () -> f x))
 
-  module private Never =
+  module Never =
     [<ReferenceEquality>]
     type 'a T =
       | Never
@@ -49,7 +49,7 @@ module Deferred =
 
     let inline never () = Never
 
-  module private Var =
+  module Var =
     [<ReferenceEquality>]
     type 'a State =
       /// The Var is not linked and does not have a value.
@@ -65,7 +65,7 @@ module Deferred =
     type 'a T =
       {mutable state : 'a State}
 
-      static member private FindRoot (d : 'a IDeferred) =
+      static member FindRoot (d : 'a IDeferred) =
         let rec findRoot original (d : 'a IDeferred) =
           match d with
           | :? ('a T) as t ->
@@ -164,7 +164,7 @@ module Deferred =
             let root = T<'a>.FindRoot(parent)
             if obj.ReferenceEquals(root, t) then
               // This is a cycle.
-              t.state <- Linked (Never.create ())
+              t.state <- Linked (Never.never ())
             else
               t.state <- Linked root
               moveFrom root callbacks

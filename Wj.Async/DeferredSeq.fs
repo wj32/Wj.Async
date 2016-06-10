@@ -3,17 +3,20 @@
 module DeferredSeq =
   open Deferred.Infix
 
-  let [<Literal>] private DeferredSeqEmpty = "The sequence is empty."
+  let [<Literal>] DeferredSeqEmpty = "The sequence is empty."
 
   type 'a T = 'a Next IDeferred
   and 'a Next =
     | Empty
     | Cons of head : 'a * tail : 'a T
 
-  module Writer =
-    let [<Literal>] private WriterAlreadyClosed = "The writer is already closed."
+  type 'a DSeq = 'a T
 
-    type 'a DSeq = 'a T
+  type 'a Unique() =
+    static member empty = Deferred.value (Empty : 'a Next)
+
+  module Writer =
+    let [<Literal>] WriterAlreadyClosed = "The writer is already closed."
 
     type 'a T = {mutable next : 'a Next IVar}
 
@@ -36,7 +39,7 @@ module DeferredSeq =
     f writer
     Writer.read writer
 
-  let empty () = Deferred.value Empty
+  let empty () = Unique.empty
 
   let inline foldGeneric upon f state xs =
     Deferred.create (fun v ->

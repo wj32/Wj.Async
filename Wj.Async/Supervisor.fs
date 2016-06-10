@@ -3,8 +3,7 @@
 open System
 
 module Supervisor =
-  let [<Literal>] private cannotAddHandlerToRoot =
-    "Handlers cannot be registered on the root supervisor."
+  let [<Literal>] cannotAddHandlerToRoot = "Handlers cannot be registered on the root supervisor."
 
   // ISupervisor functions
   let dispatcher (t : ISupervisor) = t.Dispatcher
@@ -19,7 +18,7 @@ module Supervisor =
 
   module Child = ChildSupervisor
 
-  module private Root =
+  module Root =
     [<ReferenceEquality>]
     type T =
       | Root of dispatcher : IDispatcher

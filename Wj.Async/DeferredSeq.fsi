@@ -6,10 +6,11 @@ module DeferredSeq =
     | Empty
     | Cons of head : 'a * tail : 'a T
 
+  type 'a DSeq = 'a T
+
   // Writer
 
   module Writer =
-    type 'a DSeq = 'a T
     type 'a T
 
     val create : unit -> 'a T
