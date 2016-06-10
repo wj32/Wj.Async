@@ -75,6 +75,7 @@ module Deferred =
   // Repeat
 
   module Repeat =
+    [<ReferenceEquality>]
     type T<'state, 'a> = Repeat of 'state | Done of 'a
 
   val repeat : f : ('state -> Repeat.T<'state, 'a> IDeferred) -> state : 'state -> 'a IDeferred

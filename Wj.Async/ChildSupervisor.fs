@@ -1,6 +1,7 @@
 ﻿namespace Wj.Async
 
 module internal ChildSupervisor =
+  [<ReferenceEquality>]
   type T =
     { name : string;
       mutable dispatcher : IDispatcher;

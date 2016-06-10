@@ -20,6 +20,7 @@ module Supervisor =
   module Child = ChildSupervisor
 
   module private Root =
+    [<ReferenceEquality>]
     type T =
       | Root of dispatcher : IDispatcher
 

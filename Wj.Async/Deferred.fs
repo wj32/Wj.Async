@@ -303,6 +303,7 @@ module Deferred =
     abstract member TryGetApply : unit -> 'b option
 
   module Choice =
+    [<ReferenceEquality>]
     type T<'a, 'b> =
       | Choice of deferred : 'a IDeferred * mapping : ('a -> 'b)
 
@@ -336,6 +337,7 @@ module Deferred =
     )
 
   module Repeat =
+    [<ReferenceEquality>]
     type T<'state, 'a> = Repeat of 'state | Done of 'a
 
   let repeat (f : _ -> Repeat.T<_, _> IDeferred) state =
