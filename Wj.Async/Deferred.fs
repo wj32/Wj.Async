@@ -47,7 +47,7 @@ module Deferred =
 
         member t.TryGet() = None
 
-    let inline create () = Never
+    let inline never () = Never
 
   module private Var =
     [<ReferenceEquality>]
@@ -188,7 +188,7 @@ module Deferred =
 
   let unit = value ()
 
-  let never () = Never.create () :> _ IDeferred
+  let never () = Never.never () :> _ IDeferred
 
   let ``return`` x = value x
 
