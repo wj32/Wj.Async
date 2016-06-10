@@ -46,7 +46,7 @@ module internal ChildSupervisor =
         | Result.Success _ -> ()
         result
 
-  let create name =
+  let inline create name =
     { name = name;
       dispatcher = ThreadShared.currentDispatcher ();
       parent = ThreadShared.tryCurrentSupervisor ();

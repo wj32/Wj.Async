@@ -42,7 +42,7 @@ module Supervisor =
 
         member t.Run(f) = Result.tryWith f
 
-    let create dispatcher = Root dispatcher
+    let inline create dispatcher = Root dispatcher
 
   let current () = ThreadShared.currentSupervisor ()
 

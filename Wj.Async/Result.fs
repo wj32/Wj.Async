@@ -7,7 +7,19 @@ module Result =
     | Success of 'a
     | Failure of 'error
 
-  let ``return`` x = Success x
+  let mapError t f = match t with Success x -> Success x | Failure error -> Failure (f error)
+
+  let ofSuccess x = Success x
+
+  let ofFailure error = Failure error
+
+  let tryWith f =
+    try
+      Success (f ())
+    with ex ->
+      Failure ex
+
+  let ``return`` x = ofSuccess x
 
   let bind t f = match t with Success x -> f x | Failure error -> Failure error
 
@@ -40,15 +52,3 @@ module Result =
   module Infix =
     let (>>=) t f = bind t f
     let (>>|) t f = map t f
-
-  let mapError t f = match t with Success x -> Success x | Failure error -> Failure (f error)
-
-  let ofSuccess x = ``return`` x
-
-  let ofFailure error = Failure error
-
-  let tryWith f =
-    try
-      Success (f ())
-    with ex ->
-      Failure ex

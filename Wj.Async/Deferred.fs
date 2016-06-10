@@ -47,7 +47,7 @@ module Deferred =
 
         member t.TryGet() = None
 
-    let create () = Never
+    let inline create () = Never
 
   module private Var =
     [<ReferenceEquality>]
@@ -171,11 +171,11 @@ module Deferred =
             true
           | _ -> false
 
-    let createPending () = {state = Pending (RegistrationList.create ())}
+    let inline createPending () = {state = Pending (RegistrationList.create ())}
 
-    let createLinked d = {state = Linked d}
+    let inline createLinked d = {state = Linked d}
 
-    let createValue x = {state = Value x}
+    let inline createValue x = {state = Value x}
 
   let value x = Var.createValue x :> _ IDeferred
 
@@ -362,7 +362,7 @@ module Deferred =
   module Array =
     module P = Parallelism
 
-    let foldi (f : _ -> _ -> _ -> _ IDeferred) state xs =
+    let inline foldiInline (f : _ -> _ -> _ -> _ IDeferred) state xs =
       let n = Array.length xs
       if n = 0 then
         value state
@@ -376,7 +376,9 @@ module Deferred =
         loop 0 state
         v :> _ IDeferred
 
-    let fold f state xs = foldi (fun i args -> f args) state xs
+    let foldi f state xs = foldiInline f state xs
+
+    let fold f state xs = foldiInline (fun i args -> f args) state xs
 
     let inline mapiSequential (f : _ -> _ -> _ IDeferred) xs =
       let length = Array.length xs
@@ -384,15 +386,15 @@ module Deferred =
         value Array.empty
       else
         let ys = Array.zeroCreate length
-        foldi (fun i ys x -> f i x >>| (fun y -> ys.[i] <- y; ys)) ys xs
+        foldiInline (fun i ys x -> f i x >>| (fun y -> ys.[i] <- y; ys)) ys xs
 
     let all ts = mapiSequential (fun i t -> t) ts
 
-    let allUnit ts = foldi (fun i () t -> t) () ts
+    let allUnit ts = foldiInline (fun i () t -> t) () ts
 
     let iteri p f xs =
       match p with
-      | P.Sequential -> xs |> foldi (fun i () x -> f i x) ()
+      | P.Sequential -> xs |> foldiInline (fun i () x -> f i x) ()
       | P.Parallel -> xs |> Array.mapi (fun i x -> f i x) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
@@ -439,7 +441,7 @@ module Deferred =
 
     let foldi f state xs = foldiList f state xs
 
-    let fold f state xs = foldi (fun i args -> f args) state xs
+    let fold f state xs = foldiList (fun i args -> f args) state xs
 
     let all ts = all ts
 
@@ -447,7 +449,7 @@ module Deferred =
 
     let iteri p f xs =
       match p with
-      | P.Sequential -> xs |> foldi (fun i () x -> f i x) ()
+      | P.Sequential -> xs |> foldiList (fun i () x -> f i x) ()
       | P.Parallel -> xs |> List.mapi (fun i x -> f i x) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs

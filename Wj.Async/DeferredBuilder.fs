@@ -4,27 +4,27 @@ open System
 open System.Collections.Generic
 
 type DeferredBuilder() =
-  member this.Bind(t, f) = Deferred.bind t f
+  member inline this.Bind(t, f) = Deferred.bind t f
 
-  member this.Combine(t, f) = Deferred.bind t f
+  member inline this.Combine(t, f) = Deferred.bind t f
 
-  member this.Delay(f) = f
+  member inline this.Delay(f) = f
 
-  member this.Return(x) = Deferred.value x
+  member inline this.Return(x) = Deferred.value x
 
-  member this.ReturnFrom(t) = t
+  member inline this.ReturnFrom(t) = t
 
-  member this.Run(f) = f ()
+  member inline this.Run(f) = f ()
 
-  member this.Zero() = Deferred.unit
+  member inline this.Zero() = Deferred.unit
 
-  member this.TryFinally(body, finalizer) =
+  member inline this.TryFinally(body, finalizer) =
     Supervisor.tryFinally body (fun () -> finalizer (); Deferred.unit)
 
-  member this.TryWith(body, handler) =
+  member inline this.TryWith(body, handler) =
     Supervisor.tryWith body handler Supervisor.AfterDetermined.Log
 
-  member this.Using(disposable : #IDisposable, body) =
+  member inline this.Using(disposable : #IDisposable, body) =
     // TODO: If disposable is a struct, it will get boxed in the check below. Find a way of handling
     // this.
     Supervisor.tryFinally

@@ -48,13 +48,17 @@ module DeferredSeq =
     loop state xs
     v :> _ IDeferred
 
-  let fold' (f : _ -> _ -> _ IDeferred) state xs = foldGeneric Deferred.upon f state xs
+  let inline foldInline' (f : _ -> _ -> _ IDeferred) state xs = foldGeneric Deferred.upon f state xs
 
-  let fold f state xs = foldGeneric ((|>)) f state xs
+  let fold' f state xs = foldInline' f state xs
 
-  let iter' f xs = xs |> fold' (fun () x -> f x) ()
+  let inline foldInline f state xs = foldGeneric ((|>)) f state xs
 
-  let iter f xs = xs |> fold (fun () x -> f x) ()
+  let fold f state xs = foldInline f state xs
+
+  let iter' f xs = xs |> foldInline' (fun () x -> f x) ()
+
+  let iter f xs = xs |> foldInline (fun () x -> f x) ()
 
   let inline createIterGeneric iterSpecific f xs =
     create (fun writer ->
@@ -105,7 +109,7 @@ module DeferredSeq =
 
   let tryFirst xs = xs >>| (function Empty -> None | Cons (head, _) -> Some head)
 
-  let length xs = xs |> fold (fun n x -> n + 1) 0
+  let length xs = xs |> foldInline (fun n x -> n + 1) 0
 
   let concat (xss : _ T T) = xss |> createIter' (fun write xs -> xs |> iter (fun x -> write x))
 
@@ -162,7 +166,7 @@ module DeferredSeq =
 
   let toSystemList cast xs =
     let list = new System.Collections.Generic.List<_>()
-    xs |> fold (fun l x -> list.Add(x); l) (cast list)
+    xs |> foldInline (fun l x -> list.Add(x); l) (cast list)
 
   let ofArray xs = create (fun writer -> xs |> Array.iter (Writer.write writer); Writer.close writer)
 
@@ -170,7 +174,7 @@ module DeferredSeq =
 
   let ofList xs = create (fun writer -> xs |> List.iter (Writer.write writer); Writer.close writer)
 
-  let toList xs = xs |> fold (fun acc x -> x :: acc) [] >>| List.rev
+  let toList xs = xs |> foldInline (fun acc x -> x :: acc) [] >>| List.rev
 
   let ofSeq xs = create (fun writer -> xs |> Seq.iter (Writer.write writer); Writer.close writer)
 

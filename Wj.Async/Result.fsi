@@ -7,9 +7,19 @@ module Result =
     | Success of 'a
     | Failure of 'error
 
+  // General
+
+  val mapError : T<'a, 'error> -> ('error -> 'error2) -> T<'a, 'error2>
+  val ofSuccess : 'a -> T<'a, 'error>
+  val ofFailure : 'error -> T<'a, 'error>
+
+  // Try with
+
+  val tryWith : (unit -> 'a) -> T<'a, exn>
+
   // Monad
 
-  val ``return`` : 'a -> T<'a, 'error>
+  val ``return`` : 'a -> T<'a, 'error> // same as of Success
   val bind : T<'a, 'error> -> ('a -> T<'b, 'error>) -> T<'b, 'error>
   val map : T<'a, 'error> -> ('a -> 'b) -> T<'b, 'error>
   val join : T<T<'a, 'error>, 'error> -> T<'a, 'error>
@@ -22,13 +32,3 @@ module Result =
   module Infix =
     val (>>=) : T<'a, 'error> -> ('a -> T<'b, 'error>) -> T<'b, 'error>
     val (>>|) : T<'a, 'error> -> ('a -> 'b) -> T<'b, 'error>
-
-  // General
-
-  val mapError : T<'a, 'error> -> ('error -> 'error2) -> T<'a, 'error2>
-  val ofSuccess : 'a -> T<'a, 'error> // same as ``return``
-  val ofFailure : 'error -> T<'a, 'error>
-
-  // Try with
-
-  val tryWith : (unit -> 'a) -> T<'a, exn>
