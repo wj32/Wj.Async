@@ -45,6 +45,7 @@ module DeferredSeq =
   val take : count : int -> s : 'a T -> 'a T
   val takeDetermined : s : 'a T -> 'a seq * 'a T
   val takeUntil : event : unit IDeferred -> s : 'a T -> 'a T
+  val unfold : generator : ('state -> ('a * 'state) option IDeferred) -> state : 'state -> 'a T
 
   val ofArray : 'a array -> 'a T
   val toArray : 'a T -> 'a array IDeferred

@@ -168,6 +168,16 @@ module DeferredSeq =
       loop xs
     )
 
+  let unfold (f : _ -> _ IDeferred) state =
+    create (fun writer ->
+      let rec loop state =
+        f state
+        >>> function
+        | Some (x, state) -> Writer.write writer x; loop state
+        | None -> Writer.close writer
+      loop state
+    )
+
   let toSystemList cast xs =
     let list = new System.Collections.Generic.List<_>()
     xs |> foldInline (fun l x -> list.Add(x); l) (cast list)
