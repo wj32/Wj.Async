@@ -12,8 +12,10 @@ type DeferredBuilder =
   member inline Run : (unit -> 'd) -> 'd
   member inline Zero : unit -> unit IDeferred
   member inline TryFinally : body : (unit -> 'a IDeferred) * finalizer : (unit -> unit IDeferred) -> 'a IDeferred
+  member inline TryFinally : body : (unit -> 'a IDeferred) * finalizer : (unit -> unit) -> 'a IDeferred
   member inline TryWith : body : (unit -> 'a IDeferred) * handler : (exn -> 'a IDeferred) -> 'a IDeferred
   member inline Using : disposable : 'disposable * body : ('disposable -> 'a IDeferred) -> 'a IDeferred when 'disposable :> IDisposable
   member While : guard : (unit -> bool) * body : (unit -> unit IDeferred) -> unit IDeferred
+  member While : guard : (unit -> bool IDeferred) * body : (unit -> unit IDeferred) -> unit IDeferred
   member inline For : xs : 'a seq * body : ('a -> unit IDeferred) -> unit IDeferred
   member inline For : xs : 'a DeferredSeq.T * body : ('a -> unit IDeferred) -> unit IDeferred

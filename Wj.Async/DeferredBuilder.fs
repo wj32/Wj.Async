@@ -21,6 +21,9 @@ type DeferredBuilder() =
   member inline this.TryFinally(body, finalizer) =
     Supervisor.tryFinally body finalizer
 
+  member inline this.TryFinally(body, finalizer) =
+    Supervisor.tryFinally body (fun () -> finalizer (); Deferred.unit)
+
   member inline this.TryWith(body, handler) =
     Supervisor.tryWith body handler Supervisor.AfterDetermined.Log
 
@@ -31,20 +34,25 @@ type DeferredBuilder() =
       (fun () -> body disposable)
       (fun () -> (if not (obj.ReferenceEquals(disposable, null)) then disposable.Dispose()); Deferred.unit)
 
+  member inline this.WhileGeneric(upon, bind, guard, body : unit -> unit IDeferred) =
+    bind (guard ()) (fun b ->
+      if b then
+        let v = Deferred.createVar ()
+        let rec loop () =
+          Deferred.upon (body ()) (fun () ->
+            upon (guard ()) (fun b -> if b then loop () else Deferred.set v ())
+          )
+        loop ()
+        v :> _ IDeferred
+      else
+        Deferred.unit
+    )
+
   member this.While(guard, body : unit -> unit IDeferred) =
-    if guard () then
-      let v = Deferred.createVar ()
-      let rec loop () =
-        Deferred.upon (body ()) (fun () ->
-          if guard () then
-            loop ()
-          else
-            Deferred.set v ()
-        )
-      loop ()
-      v :> _ IDeferred
-    else
-      Deferred.unit
+    this.WhileGeneric((|>), (|>), guard, body)
+
+  member this.While(guard : unit -> bool IDeferred, body : unit -> unit IDeferred) =
+    this.WhileGeneric(Deferred.upon, Deferred.bind, guard, body)
 
   member inline this.For(xs, body) = Deferred.Seq.iter Parallelism.Sequential body xs
 
