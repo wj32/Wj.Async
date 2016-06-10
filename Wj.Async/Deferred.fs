@@ -181,21 +181,20 @@ module Deferred =
 
   let createVar () = Var.createPending () :> _ IVar
 
+  let inline create f =
+    let v = createVar ()
+    f v
+    v :> _ IDeferred
+
   let unit = value ()
 
   let never () = Never.create () :> _ IDeferred
 
   let ``return`` x = value x
 
-  let bind t (f : _ -> _ IDeferred) =
-    let v = createVar ()
-    upon t (fun x -> link v (f x))
-    v :> _ IDeferred
+  let bind t (f : _ -> _ IDeferred) = create (fun v -> upon t (fun x -> link v (f x)))
 
-  let map t f =
-    let v = createVar ()
-    upon t (fun x -> set v (f x))
-    v :> _ IDeferred
+  let map t f = create (fun v -> upon t (fun x -> set v (f x)))
 
   let join t = bind t id
 
@@ -205,13 +204,13 @@ module Deferred =
     match xs with
     | [] -> value state
     | x :: xs ->
-      let v = createVar ()
-      let rec loop i state x xs =
-        match xs with
-        | [] -> link v (f i state x)
-        | x' :: xs' -> upon (f i state x) (fun state -> loop (i + 1) state x' xs')
-      loop 0 state x xs
-      v :> _ IDeferred
+      create (fun v ->
+        let rec loop i state x xs =
+          match xs with
+          | [] -> link v (f i state x)
+          | x' :: xs' -> upon (f i state x) (fun state -> loop (i + 1) state x' xs')
+        loop 0 state x xs
+      )
 
   let inline mapiListSequential (f : _ -> _ -> _ IDeferred) xs =
     map (foldiList (fun i acc x -> map (f i x) (fun y -> y :: acc)) [] xs) List.rev
@@ -230,22 +229,20 @@ module Deferred =
   let allUnit ts = allForget ts
 
   let both (t1 : 'a IDeferred) (t2 : 'b IDeferred) =
-    let v = createVar ()
-    upon t1 (fun x1 -> upon t2 (fun x2 -> set v (x1, x2)))
-    v :> _ IDeferred
+    create (fun v -> upon t1 (fun x1 -> upon t2 (fun x2 -> set v (x1, x2))))
 
   let mapAnyi (ts : _ IDeferred list) f =
-    let dispatcher = ThreadShared.currentDispatcher ()
-    let v = createVar ()
-    let mutable registrations = []
-    registrations <- ts |> List.mapi (fun i t ->
-      register' t (dispatcher.RootSupervisor, (fun x ->
-        if not v.IsDetermined then
-          registrations |> List.iter Registration.remove
-          set v (f i x)
-      ))
+    create (fun v ->
+      let dispatcher = ThreadShared.currentDispatcher ()
+      let mutable registrations = []
+      registrations <- ts |> List.mapi (fun i t ->
+        register' t (dispatcher.RootSupervisor, (fun x ->
+          if not v.IsDetermined then
+            registrations |> List.iter Registration.remove
+            set v (f i x)
+        ))
+      )
     )
-    v :> _ IDeferred
 
   let anyi (ts : _ IDeferred list) = mapAnyi ts (fun i x -> (i, x))
 
@@ -293,14 +290,10 @@ module Deferred =
     (a, v :> _ IDeferred)
 
   let ofTask (task : 'a Task) =
-    let v = createVar ()
-    task.ContinueWith(Action<Task<'a>>(fun _ -> v.Set(task.Result))) |> ignore
-    v :> _ IDeferred
+    create (fun v -> task.ContinueWith(Action<Task<'a>>(fun _ -> v.Set(task.Result))) |> ignore)
 
   let ofTaskUnit (task : Task) =
-    let v = createVar ()
-    task.ContinueWith(Action<Task>(fun _ -> v.Set(()))) |> ignore
-    v :> _ IDeferred
+    create (fun v -> task.ContinueWith(Action<Task>(fun _ -> v.Set(()))) |> ignore)
 
   open Infix
 
@@ -324,36 +317,36 @@ module Deferred =
   let choice d f = Choice.create d f :> _ IChoice
 
   let choose (choices : _ IChoice list) =
-    let v = createVar ()
-    let rec setResult (cs : _ IChoice list) =
-      match cs with
-      | [] -> assert false
-      | c :: cs ->
-        match c.TryGetApply() with
-        | Some y -> y --> v
-        | None -> setResult cs
-    let mutable registrations = []
-    registrations <- choices |> List.map (fun c ->
-      c.Register(ThreadShared.currentSupervisor (), (fun () ->
-        if not v.IsDetermined then
-          registrations |> List.iter Registration.remove
-          setResult choices
-      ))
+    create (fun v ->
+      let rec setResult (cs : _ IChoice list) =
+        match cs with
+        | [] -> assert false
+        | c :: cs ->
+          match c.TryGetApply() with
+          | Some y -> y --> v
+          | None -> setResult cs
+      let mutable registrations = []
+      registrations <- choices |> List.map (fun c ->
+        c.Register(ThreadShared.currentSupervisor (), (fun () ->
+          if not v.IsDetermined then
+            registrations |> List.iter Registration.remove
+            setResult choices
+        ))
+      )
     )
-    v :> _ IDeferred
 
   module Repeat =
     type T<'state, 'a> = Repeat of 'state | Done of 'a
 
   let repeat (f : _ -> Repeat.T<_, _> IDeferred) state =
-    let v = createVar ()
-    let rec loop state =
-      f state >>> (function
-        | Repeat.Repeat state -> loop state
-        | Repeat.Done x -> x --> v
-      )
-    loop state
-    v :> _ IDeferred
+    create (fun v ->
+      let rec loop state =
+        f state >>> (function
+          | Repeat.Repeat state -> loop state
+          | Repeat.Done x -> x --> v
+        )
+      loop state
+    )
 
   let repeatForever (f : _ -> _ IDeferred) state =
     let rec loop state = f state >>> (fun state -> loop state)
@@ -367,14 +360,14 @@ module Deferred =
       if n = 0 then
         value state
       else
-        let v = createVar ()
-        let rec loop i state =
-          if i = n - 1 then
-            f i state xs.[i] >-- v
-          else
-            f i state xs.[i] >>> (fun state -> loop (i + 1) state)
-        loop 0 state
-        v :> _ IDeferred
+        create (fun v ->
+          let rec loop i state =
+            if i = n - 1 then
+              f i state xs.[i] >-- v
+            else
+              f i state xs.[i] >>> (fun state -> loop (i + 1) state)
+          loop 0 state
+        )
 
     let foldi f state xs = foldiInline f state xs
 
@@ -424,14 +417,14 @@ module Deferred =
       if n = 0 then
         value None
       else
-        let v = createVar ()
-        let rec loop i =
-          if i = n - 1 then
-            f xs.[i] >-- v
-          else
-            f xs.[i] >>> (fun y -> match y with Some _ -> y --> v | None -> loop (i + 1))
-        loop 0
-        v :> _ IDeferred
+        create (fun v ->
+          let rec loop i =
+            if i = n - 1 then
+              f xs.[i] >-- v
+            else
+              f xs.[i] >>> (fun y -> match y with Some _ -> y --> v | None -> loop (i + 1))
+          loop 0
+        )
 
     let tryFind (f : _ -> bool IDeferred) xs =
       xs |> tryPick (fun x -> f x >>| (fun b -> if b then Some x else None))
@@ -475,13 +468,13 @@ module Deferred =
       match xs with
       | [] -> value None
       | x :: xs ->
-        let v = createVar ()
-        let rec loop x xs =
-          match xs with
-          | [] -> f x >-- v
-          | x' :: xs'' -> f x >>> (fun y -> match y with Some _ -> y --> v | None -> loop x' xs'')
-        loop x xs
-        v :> _ IDeferred
+        create (fun v ->
+          let rec loop x xs =
+            match xs with
+            | [] -> f x >-- v
+            | x' :: xs'' -> f x >>> (fun y -> match y with Some _ -> y --> v | None -> loop x' xs'')
+          loop x xs
+        )
 
     let tryFind (f : _ -> bool IDeferred) xs =
       xs |> tryPick (fun x -> f x >>| (fun b -> if b then Some x else None))
@@ -496,14 +489,14 @@ module Deferred =
       | _ ->
         let e = xs.GetEnumerator()
         tryFinally (fun () ->
-          let v = createVar ()
-          let rec loop i state =
-            if e.MoveNext() then
-              f i state e.Current >>> (fun state -> loop (i + 1) state)
-            else
-              state --> v
-          loop 0 state
-          v :> _ IDeferred
+          create (fun v ->
+            let rec loop i state =
+              if e.MoveNext() then
+                f i state e.Current >>> (fun state -> loop (i + 1) state)
+              else
+                state --> v
+            loop 0 state
+          )
         ) (fun () -> e.Dispose(); unit)
 
     let fold f state xs = foldi (fun i args -> f args) state xs
@@ -561,14 +554,14 @@ module Deferred =
       | _ ->
         let e = xs.GetEnumerator()
         tryFinally (fun () ->
-          let v = createVar ()
-          let rec loop () =
-            if e.MoveNext() then
-              f e.Current >>> (fun y -> match y with Some _ -> y --> v | None -> loop ())
-            else
-              None --> v
-          loop ()
-          v :> _ IDeferred
+          create (fun v ->
+            let rec loop () =
+              if e.MoveNext() then
+                f e.Current >>> (fun y -> match y with Some _ -> y --> v | None -> loop ())
+              else
+                None --> v
+            loop ()
+          )
         ) (fun () -> e.Dispose(); unit)
 
     let tryFind (f : _ -> bool IDeferred) xs =

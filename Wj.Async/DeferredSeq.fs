@@ -31,24 +31,22 @@ module DeferredSeq =
 
     let read t = t.next :> _ IDeferred
 
-  let inline createInline f =
+  let inline create f =
     let writer = Writer.create ()
     f writer
     Writer.read writer
 
-  let create f = createInline f
-
   let empty () = Deferred.value Empty
 
   let inline foldGeneric upon f state xs =
-    let v = Deferred.createVar ()
-    let rec loop state tail =
-      tail
-      >>> function
-      | Empty -> state --> v
-      | Cons (head, tail) -> upon (f state head) (fun state -> loop state tail)
-    loop state xs
-    v :> _ IDeferred
+    Deferred.create (fun v ->
+      let rec loop state tail =
+        tail
+        >>> function
+        | Empty -> state --> v
+        | Cons (head, tail) -> upon (f state head) (fun state -> loop state tail)
+      loop state xs
+    )
 
   let inline foldInline' (f : _ -> _ -> _ IDeferred) state xs = foldGeneric Deferred.upon f state xs
 
@@ -67,7 +65,7 @@ module DeferredSeq =
   let iter f xs = iterInline f xs
 
   let inline createIterGeneric iterSpecific f xs =
-    createInline (fun writer ->
+    create (fun writer ->
       xs |> iterSpecific (fun x -> f (Writer.write writer) x) >>> (fun () -> Writer.close writer)
     )
 
@@ -80,7 +78,7 @@ module DeferredSeq =
   let map f xs = xs |> createIter (fun write x -> f x |> (fun y -> write y))
 
   let init length (f : _ -> _ IDeferred) =
-    createInline (fun writer ->
+    create (fun writer ->
       let rec loop i =
         if i = length then
           Writer.close writer
@@ -99,14 +97,14 @@ module DeferredSeq =
     xs |> createIter' (fun write x -> f x >>| (fun b -> if b then write x))
 
   let tryPick (f : _ -> _ IDeferred) xs =
-    let v = Deferred.createVar ()
-    let rec loop tail =
-      tail
-      >>> function
-      | Empty -> None --> v
-      | Cons (head, tail) -> f head >>> (fun y -> match y with Some _ -> y --> v | None -> loop tail)
-    loop xs
-    v :> _ IDeferred
+    Deferred.create (fun v ->
+      let rec loop tail =
+        tail
+        >>> function
+        | Empty -> None --> v
+        | Cons (head, tail) -> f head >>> (fun y -> match y with Some _ -> y --> v | None -> loop tail)
+      loop xs
+    )
 
   let tryFind (f : _ -> bool IDeferred) xs =
     xs |> tryPick (fun x -> f x >>| (fun b -> if b then Some x else None))
@@ -120,7 +118,7 @@ module DeferredSeq =
   let concat (xss : _ T T) = xss |> createIter' (fun write xs -> xs |> iterInline (fun x -> write x))
 
   let append xs1 xs2 =
-    createInline (fun writer ->
+    create (fun writer ->
       xs1 |> iterInline (Writer.write writer)
       >>> fun () ->
       xs2 |> iterInline (Writer.write writer)
@@ -129,7 +127,7 @@ module DeferredSeq =
     )
 
   let interleave (xss : _ T T) =
-    createInline (fun writer ->
+    create (fun writer ->
       let mutable active = 1
       let increment () = active <- active + 1
       let decrement () = active <- active - 1; if active = 0 then Writer.close writer
@@ -140,7 +138,7 @@ module DeferredSeq =
     )
 
   let take count xs =
-    createInline (fun writer ->
+    create (fun writer ->
       let rec loop n tail =
         if n = 0 then
           Writer.close writer
@@ -161,7 +159,7 @@ module DeferredSeq =
     loop xs
 
   let takeUntil event xs =
-    createInline (fun writer ->
+    create (fun writer ->
       let rec loop tail =
         Deferred.choose [Deferred.choice event (fun () -> Empty); Deferred.choice tail id]
         >>> function
@@ -174,14 +172,14 @@ module DeferredSeq =
     let list = new System.Collections.Generic.List<_>()
     xs |> foldInline (fun l x -> list.Add(x); l) (cast list)
 
-  let ofArray xs = createInline (fun writer -> xs |> Array.iter (Writer.write writer); Writer.close writer)
+  let ofArray xs = create (fun writer -> xs |> Array.iter (Writer.write writer); Writer.close writer)
 
   let toArray xs = toSystemList id xs >>| (fun list -> list.ToArray())
 
-  let ofList xs = createInline (fun writer -> xs |> List.iter (Writer.write writer); Writer.close writer)
+  let ofList xs = create (fun writer -> xs |> List.iter (Writer.write writer); Writer.close writer)
 
   let toList xs = xs |> foldInline (fun acc x -> x :: acc) [] >>| List.rev
 
-  let ofSeq xs = createInline (fun writer -> xs |> Seq.iter (Writer.write writer); Writer.close writer)
+  let ofSeq xs = create (fun writer -> xs |> Seq.iter (Writer.write writer); Writer.close writer)
 
   let toSeq xs = toSystemList (fun list -> list :> _ seq) xs

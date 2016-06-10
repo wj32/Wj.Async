@@ -20,6 +20,7 @@ module Deferred =
 
   val value : value : 'a -> 'a IDeferred
   val createVar : unit -> 'a IVar
+  val inline create : ('a IVar -> unit) -> 'a IDeferred
   val unit : unit IDeferred
   val never : unit -> 'a IDeferred
 

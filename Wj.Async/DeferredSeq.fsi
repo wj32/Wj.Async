@@ -18,7 +18,7 @@ module DeferredSeq =
     val write : 'a T -> value : 'a -> unit
     val read : 'a T -> 'a DSeq
 
-  val create : f : ('a Writer.T -> unit) -> 'a T
+  val inline create : f : ('a Writer.T -> unit) -> 'a T
   val empty : unit -> 'a T
 
   // General
