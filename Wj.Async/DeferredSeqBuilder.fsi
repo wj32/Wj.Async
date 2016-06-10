@@ -1,5 +1,4 @@
-﻿
-namespace Wj.Async
+﻿namespace Wj.Async
 
 open System
 
