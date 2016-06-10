@@ -15,6 +15,7 @@
 #load "Supervisor.fs"
 #load "Dispatcher.fs"
 #load "DeferredBuilder.fs"
+#load "DeferredSeqBuilder.fs"
 #load "Clock.fs"
 #load "Operators.fs"
 
@@ -31,7 +32,7 @@ let testBind () =
     Deferred.unit
     >>= fun () ->
     afterMs 2000
-    >>= fun() ->
+    >>= fun () ->
     printfn "Waited 2 seconds."
     printfn "Returning 1234."
     ``return`` 1234

@@ -39,6 +39,11 @@ module DeferredSeq =
     f writer
     Writer.read writer
 
+  let inline create' (f : _ -> unit IDeferred) =
+    let writer = Writer.create ()
+    f writer >>> (fun () -> Writer.close writer)
+    Writer.read writer
+
   let empty () = Unique.empty
 
   let inline foldGeneric upon f state xs =
@@ -68,9 +73,7 @@ module DeferredSeq =
   let iter f xs = iterInline f xs
 
   let inline createIterGeneric iterSpecific f xs =
-    create (fun writer ->
-      xs |> iterSpecific (fun x -> f (Writer.write writer) x) >>> (fun () -> Writer.close writer)
-    )
+    create' (fun writer -> xs |> iterSpecific (fun x -> f (Writer.write writer) x))
 
   let inline createIter' (f : _ -> _ -> unit IDeferred) xs = createIterGeneric iterInline' f xs
 

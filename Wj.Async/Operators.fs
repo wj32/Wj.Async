@@ -6,6 +6,7 @@ module Operators =
   let choice = Deferred.choice
   let choose = Deferred.choose
   let deferred = new DeferredBuilder.B()
+  let deferredSeq = new DeferredSeqBuilder.B()
   let dontWaitFor = Deferred.dontWaitFor
   let never = Deferred.never
   let now = Deferred.unit
