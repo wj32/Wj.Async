@@ -90,6 +90,7 @@ let testExceptions () =
             finally
               printfn "Executing finally!"
               raise (invalidOp "Finalizer exception!")
+              ()
           with ex ->
             do! Deferred.unit
             printfn "Caught exception in try or finally: %s" (string ex)
