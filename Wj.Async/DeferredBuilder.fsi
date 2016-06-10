@@ -5,7 +5,7 @@ open System
 type DeferredBuilder =
   new : unit -> DeferredBuilder
   member inline Bind : 'a IDeferred * ('a -> 'b IDeferred) -> 'b IDeferred
-  member inline Combine : 'a IDeferred * ('a -> 'b IDeferred) -> 'b IDeferred
+  member inline Combine : unit IDeferred * (unit -> 'b IDeferred) -> 'b IDeferred
   member inline Delay : 'f -> 'f
   member inline Return : 'a -> 'a IDeferred
   member inline ReturnFrom : 'd -> 'd
