@@ -66,6 +66,7 @@ let testExceptions () =
                           raise (invalidOp "Exception in inner supervisor!")
                         finally
                           printfn "Finally in inner supervisor!"
+                          Deferred.unit
                       })
                       (fun ex -> printfn "Inner observer saw exception: %s" (string ex))
                 })
@@ -76,6 +77,7 @@ let testExceptions () =
               do! Deferred.unit
             finally
               printfn "Executing finally!"
+              Deferred.unit
           with ex ->
             printfn "Caught exception: %s" (string ex)
 

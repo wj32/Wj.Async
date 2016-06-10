@@ -19,7 +19,7 @@ type DeferredBuilder() =
   member inline this.Zero() = Deferred.unit
 
   member inline this.TryFinally(body, finalizer) =
-    Supervisor.tryFinally body (fun () -> finalizer (); Deferred.unit)
+    Supervisor.tryFinally body finalizer
 
   member inline this.TryWith(body, handler) =
     Supervisor.tryWith body handler Supervisor.AfterDetermined.Log
@@ -31,7 +31,7 @@ type DeferredBuilder() =
       (fun () -> body disposable)
       (fun () -> (if not (obj.ReferenceEquals(disposable, null)) then disposable.Dispose()); Deferred.unit)
 
-  member this.While(guard, body) =
+  member this.While(guard, body : unit -> unit IDeferred) =
     if guard () then
       let v = Deferred.createVar ()
       let rec loop () =
@@ -46,6 +46,6 @@ type DeferredBuilder() =
     else
       Deferred.unit
 
-  member this.For(xs, body) = Deferred.Seq.iter Parallelism.Sequential body xs
+  member inline this.For(xs, body) = Deferred.Seq.iter Parallelism.Sequential body xs
 
-  member this.For(xs, body) = DeferredSeq.iter body xs
+  member inline this.For(xs, body) = DeferredSeq.iter' body xs
