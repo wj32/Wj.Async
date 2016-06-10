@@ -37,11 +37,11 @@ module Deferred =
   // Infix operators
 
   module Infix =
-    val (>>=) : 'a IDeferred -> ('a -> 'b IDeferred) -> 'b IDeferred
-    val (>>|) : 'a IDeferred -> ('a -> 'b) -> 'b IDeferred
-    val (>>>) : 'a IDeferred -> ('a -> unit) -> unit
-    val (-->) : 'a -> 'a IVar -> unit
-    val (>--) : 'a IDeferred -> 'a IVar -> unit
+    val inline (>>=) : 'a IDeferred -> ('a -> 'b IDeferred) -> 'b IDeferred
+    val inline (>>|) : 'a IDeferred -> ('a -> 'b) -> 'b IDeferred
+    val inline (>>>) : 'a IDeferred -> ('a -> unit) -> unit
+    val inline (-->) : 'a -> 'a IVar -> unit
+    val inline (>--) : 'a IDeferred -> 'a IVar -> unit
 
   // General
 

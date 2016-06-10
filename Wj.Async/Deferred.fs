@@ -220,11 +220,11 @@ module Deferred =
   let allForget ts = foldiList (fun i () t -> t) () ts
 
   module Infix =
-    let (>>=) t f = bind t f
-    let (>>|) t f = map t f
-    let (>>>) t f = upon t f
-    let (-->) value var = set var value
-    let (>--) d var = link var d
+    let inline (>>=) t f = bind t f
+    let inline (>>|) t f = map t f
+    let inline (>>>) t f = upon t f
+    let inline (-->) value var = set var value
+    let inline (>--) d var = link var d
 
   let allUnit ts = allForget ts
 
