@@ -14,15 +14,13 @@ module DeferredSeqBuilder =
     member inline Delay : (unit -> 'a M) -> 'a M
     member inline Run : 'a M -> 'a T
     member inline Yield : 'a -> 'a M
-    member inline YieldFrom : 'a M -> 'a M
-    member inline YieldFrom : 'a IDeferred -> 'a M
+    member inline YieldFrom : 'a T -> 'a M
     member inline Zero : unit -> 'a M
-    member inline TryFinally : body : (unit -> 'a M) * finalizer : (unit -> 'a M) -> 'a M
-    member inline TryFinally : body : (unit -> 'a M) * finalizer : (unit -> unit IDeferred) -> 'a M
-    member inline TryFinally : body : (unit -> 'a M) * finalizer : (unit -> unit) -> 'a M
-    member inline TryWith : body : (unit -> 'a M) * handler : (exn -> 'a M) -> 'a M
+    member inline TryFinally : body : 'a M * finalizer : (unit -> unit IDeferred) -> 'a M
+    member inline TryFinally : body : 'a M * finalizer : (unit -> unit) -> 'a M
+    member inline TryWith : body : 'a M * handler : (exn -> 'a M) -> 'a M
     member inline Using : disposable : 'disposable * body : ('disposable -> 'a M) -> 'a M when 'disposable :> IDisposable
-    member inline While : guard : (unit -> bool) * body : (unit -> 'a M) -> 'a M
-    member inline While : guard : (unit -> bool IDeferred) * body : (unit -> 'a M) -> 'a M
+    member inline While : guard : (unit -> bool) * body : 'a M -> 'a M
+    member inline While : guard : (unit -> bool IDeferred) * body : 'a M -> 'a M
     member inline For : xs : 'b seq * body : ('b -> 'a M) -> 'a M
     member inline For : xs : 'b T * body : ('b -> 'a M) -> 'a M

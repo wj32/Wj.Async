@@ -36,13 +36,15 @@ module DeferredSeq =
 
   let inline create f =
     let writer = Writer.create ()
+    let t = Writer.read writer
     f writer
-    Writer.read writer
+    t
 
   let inline create' (f : _ -> unit IDeferred) =
     let writer = Writer.create ()
+    let t = Writer.read writer
     f writer >>> (fun () -> Writer.close writer)
-    Writer.read writer
+    t
 
   let empty () = Unique.empty
 

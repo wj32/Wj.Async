@@ -266,3 +266,53 @@ let testCycle () =
     do! Deferred.anyUnit [v1; v2; v3; afterMs 1000]
     printfn "Waited 1 second - detected cycle!"
   })
+
+let testDSeqBuilder () =
+  Dispatcher.run dispatcher (fun () -> deferred {
+    let xs = deferredSeq {
+      yield "First"
+
+      let! x = afterMs 1000 >>| fun () -> "Waited 1s"
+      yield x
+
+      printfn "YieldFrom:"
+
+      yield! DeferredSeq.init 10 (fun i -> afterMs 100 >>| fun () -> string (i + 1))
+      if x <> "Waited 1s NOT" then
+        yield "This should be printed"
+
+      printfn "while:"
+
+      let mutable i = 1
+      while (afterMs 50 >>| fun () -> i <= 10) do
+        yield string i
+        yield string (i + 10)
+        i <- i + 1
+
+      printfn "for:"
+
+      for i in 1 .. 10 do
+        yield string i
+        yield string (i + 10)
+
+        try
+          try
+            if i = 9 then
+              raise (invalidOp "Raise at i = 9")
+          with ex ->
+            printfn "Caught exception: %A" ex
+            yield "Yield from exception handler"
+        finally
+          printfn "Executing finally"
+
+      printfn "DSeq disposable:"
+      use _ = new MyStruct(0)
+      use _ = new MyStruct(1)
+      use _ = new MyClass(0)
+      use _ = null
+
+      printfn "Done"
+    }
+    for x in xs do
+      printfn "%s" x
+  })

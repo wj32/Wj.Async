@@ -19,23 +19,18 @@ module DeferredSeqBuilder =
 
     member inline this.Yield(x) = fun writer -> DeferredSeq.Writer.write writer x; Deferred.unit
 
-    member inline this.YieldFrom(m : _ M) = m
-
-    member inline this.YieldFrom(d) = fun writer -> d >>| DeferredSeq.Writer.write writer
+    member inline this.YieldFrom(xs) = fun writer -> xs |> DeferredSeq.iter (DeferredSeq.Writer.write writer)
 
     member inline this.Zero() : _ M = fun writer -> Deferred.unit
 
-    member inline this.TryFinally(body : unit -> _ M, finalizer) = fun writer ->
-      Supervisor.tryFinally (fun () -> body () writer) (fun () -> finalizer () writer)
+    member inline this.TryFinally(body : _ M, finalizer) = fun writer ->
+      Supervisor.tryFinally (fun () -> body writer) finalizer
 
-    member inline this.TryFinally(body : unit -> _ M, finalizer) = fun writer ->
-      Supervisor.tryFinally (fun () -> body () writer) finalizer
+    member inline this.TryFinally(body : _ M, finalizer) = fun writer ->
+      Supervisor.tryFinally (fun () -> body writer) (fun () -> finalizer (); Deferred.unit)
 
-    member inline this.TryFinally(body : unit -> _ M, finalizer) = fun writer ->
-      Supervisor.tryFinally (fun () -> body () writer) (fun () -> finalizer (); Deferred.unit)
-
-    member inline this.TryWith(body : unit -> _ M, handler) = fun writer ->
-      Supervisor.tryWith (fun () -> body () writer) (fun ex -> handler ex writer) Supervisor.AfterDetermined.Log
+    member inline this.TryWith(body : _ M, handler) = fun writer ->
+      Supervisor.tryWith (fun () -> body writer) (fun ex -> handler ex writer) Supervisor.AfterDetermined.Log
 
     member inline this.Using(disposable : #IDisposable, body : _ -> _ M) = fun writer ->
       // TODO: If disposable is a struct, it will get boxed in the check below. Find a way of handling
@@ -44,12 +39,12 @@ module DeferredSeqBuilder =
         (fun () -> body disposable writer)
         (fun () -> (if not (obj.ReferenceEquals(disposable, null)) then disposable.Dispose()); Deferred.unit)
 
-    member inline this.WhileGeneric(upon, bind, guard, body : unit -> _ M) = fun writer ->
+    member inline this.WhileGeneric(upon, bind, guard, body : _ M) = fun writer ->
       bind (guard ()) (fun b ->
         if b then
           let v = Deferred.createVar ()
           let rec loop () =
-            Deferred.upon (body () writer) (fun () ->
+            Deferred.upon (body writer) (fun () ->
               upon (guard ()) (fun b -> if b then loop () else Deferred.set v ())
             )
           loop ()
@@ -58,10 +53,10 @@ module DeferredSeqBuilder =
           Deferred.unit
       )
 
-    member inline this.While(guard, body : unit -> _ M) =
+    member inline this.While(guard, body) =
       this.WhileGeneric((|>), (|>), guard, body)
 
-    member inline this.While(guard : unit -> bool IDeferred, body : unit -> _ M) =
+    member inline this.While(guard : unit -> bool IDeferred, body) =
       this.WhileGeneric(Deferred.upon, Deferred.bind, guard, body)
 
     member inline this.For(xs, body : _ -> _ M) = fun writer ->
