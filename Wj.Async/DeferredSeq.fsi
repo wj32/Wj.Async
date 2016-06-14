@@ -23,7 +23,7 @@ module DeferredSeq =
   val inline create' : f : ('a Writer.T -> unit IDeferred) -> 'a T
   val empty : unit -> 'a T
 
-  // General
+  // Sequence processing
 
   val fold' : folder : ('state -> 'a -> 'state IDeferred) -> state : 'state -> s : 'a T -> 'state IDeferred
   val fold : folder : ('state -> 'a -> 'state) -> state : 'state -> s : 'a T -> 'state IDeferred
@@ -38,6 +38,8 @@ module DeferredSeq =
   val tryPick : chooser : ('a -> 'b option IDeferred) -> s : 'a T -> 'b option IDeferred
   val tryFind : predicate : ('a -> bool IDeferred) -> s : 'a T -> 'a option IDeferred
 
+  // General
+
   val first : s : 'a T -> 'a IDeferred
   val tryFirst : s : 'a T -> 'a option IDeferred
   val length : s : 'a T -> int IDeferred
@@ -45,7 +47,7 @@ module DeferredSeq =
   val append : s1 : 'a T -> s2 : 'a T -> 'a T
   val interleave : ss : 'a T T -> 'a T
   val take : count : int -> s : 'a T -> 'a T
-  val takeDetermined : s : 'a T -> 'a seq * 'a T
+  val takeDetermined : s : 'a T -> 'a array * 'a T
   val takeUntil : event : unit IDeferred -> s : 'a T -> 'a T
   val unfold : generator : ('state -> ('a * 'state) option IDeferred) -> state : 'state -> 'a T
 

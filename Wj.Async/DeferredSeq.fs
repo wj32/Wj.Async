@@ -163,7 +163,7 @@ module DeferredSeq =
     let rec loop tail =
       match Deferred.tryGet tail with
       | Some (Cons (head, tail)) -> list.Add(head); loop tail
-      | _ -> (list :> _ seq, tail)
+      | _ -> (list.ToArray(), tail)
     loop xs
 
   let takeUntil event xs =
