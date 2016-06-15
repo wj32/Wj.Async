@@ -3,7 +3,7 @@
 open System
 
 module Supervisor =
-  let [<Literal>] cannotAddHandlerToRoot = "Handlers cannot be registered on the root supervisor."
+  let [<Literal>] CannotAddHandlerToRoot = "Handlers cannot be registered on the root supervisor."
 
   // ISupervisor functions
   let dispatcher (t : ISupervisor) = t.Dispatcher
@@ -35,10 +35,10 @@ module Supervisor =
         member t.Detach() = ()
 
         member t.UponException(handler : exn -> unit) : unit =
-          invalidOp cannotAddHandlerToRoot
+          invalidOp CannotAddHandlerToRoot
 
         member t.UponException(supervisedHandler : exn SupervisedCallback) : unit =
-          invalidOp cannotAddHandlerToRoot
+          invalidOp CannotAddHandlerToRoot
 
         member t.Run(f) = Result.tryWith f
 

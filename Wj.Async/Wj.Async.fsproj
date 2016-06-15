@@ -51,6 +51,8 @@
     <Compile Include="Registration.fs" />
     <Compile Include="RegistrationList.fsi" />
     <Compile Include="RegistrationList.fs" />
+    <Compile Include="Queue.fsi" />
+    <Compile Include="Queue.fs" />
     <Compile Include="CoreTypes.fs" />
     <Compile Include="IVar.fs" />
     <Compile Include="Parallelism.fs" />
