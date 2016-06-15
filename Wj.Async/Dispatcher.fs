@@ -1,6 +1,5 @@
 ﻿namespace Wj.Async
 
-open System.Collections.Generic;
 open System.Threading;
 
 module Dispatcher =
@@ -11,14 +10,14 @@ module Dispatcher =
 
   [<ReferenceEquality>]
   type T =
-    { queue : unit SupervisedCallback Queue;
+    { queue : unit SupervisedCallback Queue.T;
       queueLock : obj;
       mutable rootSupervisor : ISupervisor; }
 
     interface IDispatcher with
       member t.Enqueue(supervisedCallback) =
         lock t.queueLock (fun () ->
-          t.queue.Enqueue(supervisedCallback)
+          Queue.enqueue t.queue supervisedCallback
           Monitor.Pulse(t.queueLock)
         )
 
@@ -35,12 +34,9 @@ module Dispatcher =
           )
           let rec loop () =
             let f = lock t.queueLock (fun () ->
-              while t.queue.Count = 0 && not d.IsDetermined do
+              while Queue.isEmpty t.queue && not d.IsDetermined do
                 Monitor.Wait(t.queueLock) |> ignore
-              if t.queue.Count <> 0 then
-                Some (t.queue.Dequeue())
-              else
-                None
+              Queue.tryDequeue t.queue
             )
             match f with
             | Some (supervisor, f) ->
@@ -60,7 +56,7 @@ module Dispatcher =
 
   let create () =
     let t =
-      { queue = new Queue<ISupervisor * (unit -> unit)>();
+      { queue = Queue.create ();
         queueLock = new obj();
         rootSupervisor = Unchecked.defaultof<ISupervisor>; }
     t.rootSupervisor <- Supervisor.createRoot t

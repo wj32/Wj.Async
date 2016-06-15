@@ -5,6 +5,7 @@
 #load "IRegistration.fs"
 #load "Registration.fs"
 #load "RegistrationList.fs"
+#load "Queue.fs"
 #load "CoreTypes.fs"
 #load "Parallelism.fs"
 #load "IVar.fs"
@@ -64,7 +65,7 @@ let testExceptions () =
                         printfn "My supervisor is %s." (ThreadShared.currentSupervisor()).Name
                         printfn "My parent supervisor is %s." (ThreadShared.currentSupervisor()).Parent.Value.Name
                         try
-                          raise (invalidOp "Exception in inner supervisor!")
+                          invalidOp "Exception in inner supervisor!"
                         finally
                           printfn "Finally in inner supervisor!"
                           Deferred.unit
@@ -74,7 +75,7 @@ let testExceptions () =
                 (fun ex -> printfn "Observer saw exception: %s" (string ex))
               )
               do! Deferred.unit
-              raise (invalidOp "Exception!")
+              invalidOp "Exception!"
               do! Deferred.unit
             finally
               printfn "Executing finally!"
@@ -85,11 +86,11 @@ let testExceptions () =
           try
             try
               do! Deferred.unit
-              raise (invalidOp "Exception 2!")
+              invalidOp "Exception 2!"
               do! Deferred.unit
             finally
               printfn "Executing finally!"
-              raise (invalidOp "Finalizer exception!")
+              invalidOp "Finalizer exception!"
               ()
           with ex ->
             do! Deferred.unit
@@ -99,20 +100,20 @@ let testExceptions () =
             if counter % 2 = 0 then
               printfn "EVEN"
               do! afterMs 100
-              raise (invalidOp "Test exception!")
+              invalidOp "Test exception!"
               do! Deferred.unit
           with ex ->
             do! afterMs 100
             printfn "Caught exception: %s" (string ex)
             try
               do! Deferred.unit
-              raise (invalidOp "Exception in exception handler that will be caught!")
+              invalidOp "Exception in exception handler that will be caught!"
               do! Deferred.unit
             with ex ->
               do! Deferred.unit
               printfn "Caught exception in exception handler that will be caught: %s" (string ex)
             do! Deferred.unit
-            raise (invalidOp "Exception in exception handler!")
+            invalidOp "Exception in exception handler!"
 
           counter <- counter + 1
       with ex ->
@@ -298,7 +299,7 @@ let testDSeqBuilder () =
         try
           try
             if i = 9 then
-              raise (invalidOp "Raise at i = 9")
+              invalidOp "Raise at i = 9"
           with ex ->
             printfn "Caught exception: %A" ex
             yield "Yield from exception handler"
@@ -311,8 +312,14 @@ let testDSeqBuilder () =
       use _ = new MyClass(0)
       use _ = null
 
+      yield "Yielding just before raise"
+      invalidOp "Test exception"
+
       printfn "Done"
     }
-    for x in xs do
-      printfn "%s" x
+    try
+      for x in xs do
+        printfn "%s" x
+    with ex ->
+      printfn "Caught exception: %A" ex
   })
