@@ -14,7 +14,7 @@ module Supervisor =
   let uponException (t : ISupervisor) (handler : exn -> unit) = t.UponException(handler)
   let uponException' (t : ISupervisor) (supervisedHandler : exn SupervisedCallback) =
     t.UponException(supervisedHandler)
-  let run (t : ISupervisor) f = t.Run(f)
+  let tryRun (t : ISupervisor) f = t.TryRun(f)
 
   module Child = ChildSupervisor
 
@@ -40,7 +40,7 @@ module Supervisor =
         member t.UponException(supervisedHandler : exn SupervisedCallback) : unit =
           invalidOp CannotAddHandlerToRoot
 
-        member t.Run(f) = Result.tryWith f
+        member t.TryRun(f) = Result.tryWith f
 
     let inline create dispatcher = Root dispatcher
 
@@ -58,10 +58,10 @@ module Supervisor =
   let supervise (f : unit -> _ IDeferred) observer =
     let t = createNamed "Supervisor.supervise"
     uponException t observer
-    let result = run t f
+    let result = tryRun t f
     match result with
     | Result.Success d -> d
-    | Result.Failure _ -> Deferred.never ()
+    | Result.Failure ex -> sendException t ex; Deferred.never ()
 
   module AfterDetermined =
     type T = Raise | Log | Ignore
@@ -77,7 +77,7 @@ module Supervisor =
     detach t
     let startHandlingAfterDetermined () =
       uponException t (fun ex -> handleAfterDetermined afterDetermined ex)
-    let result = run t f
+    let result = tryRun t f
     match result with
     | Result.Success d ->
       if Deferred.isDetermined d then

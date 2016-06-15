@@ -70,9 +70,9 @@ let testExceptions () =
                           printfn "Finally in inner supervisor!"
                           Deferred.unit
                       })
-                      (fun ex -> printfn "Inner observer saw exception: %s" (string ex))
+                      (fun ex -> printfn "Inner observer saw exception: %A" ex)
                 })
-                (fun ex -> printfn "Observer saw exception: %s" (string ex))
+                (fun ex -> printfn "Observer saw exception: %A" ex)
               )
               do! Deferred.unit
               invalidOp "Exception!"
@@ -81,7 +81,7 @@ let testExceptions () =
               printfn "Executing finally!"
               Deferred.unit
           with ex ->
-            printfn "Caught exception: %s" (string ex)
+            printfn "Caught exception: %A" ex
 
           try
             try
@@ -94,7 +94,7 @@ let testExceptions () =
               ()
           with ex ->
             do! Deferred.unit
-            printfn "Caught exception in try or finally: %s" (string ex)
+            printfn "Caught exception in try or finally: %A" ex
 
           try
             if counter % 2 = 0 then
@@ -104,27 +104,35 @@ let testExceptions () =
               do! Deferred.unit
           with ex ->
             do! afterMs 100
-            printfn "Caught exception: %s" (string ex)
+            printfn "Caught exception: %A" ex
             try
               do! Deferred.unit
               invalidOp "Exception in exception handler that will be caught!"
               do! Deferred.unit
             with ex ->
               do! Deferred.unit
-              printfn "Caught exception in exception handler that will be caught: %s" (string ex)
+              printfn "Caught exception in exception handler that will be caught: %A" ex
             do! Deferred.unit
             invalidOp "Exception in exception handler!"
 
           counter <- counter + 1
       with ex ->
-        printfn "Caught exception in exception handler: %s" (string ex)
+        printfn "Caught exception in exception handler: %A" ex
         do! afterMs 2000
       return ()
     })
   with ex ->
-    printfn "Uncaught exception: %s" (string ex)
+    printfn "Uncaught exception: %A" ex
 
   printfn "Dispatcher stopped."
+
+let testUncaughtException () =
+  try
+    Dispatcher.run dispatcher (fun () -> deferred {
+      invalidOp "This goes to the root supervisor."
+    })
+  with ex ->
+    printfn "Uncaught exception: %A" ex
 
 let testFor () =
   Dispatcher.run dispatcher (fun () -> deferred {
@@ -203,21 +211,25 @@ type MyClass(x : int) =
     member this.Dispose() = printfn "Class dispose!"
 
 let testUsing () =
-  Dispatcher.run dispatcher (fun () -> deferred {
-    printfn "Default:"
-    using (new MyStruct(0)) (fun _ -> printfn "Struct default")
-    using (new MyStruct(1)) (fun _ -> printfn "Struct non-default")
-    using (new MyClass(0)) (fun _ -> printfn "Class")
-    using null (fun _ -> printfn "null")
+  try
+    Dispatcher.run dispatcher (fun () -> deferred {
+      printfn "Default:"
+      using (new MyStruct(0)) (fun _ -> printfn "Struct default")
+      using (new MyStruct(1)) (fun _ -> printfn "Struct non-default")
+      using (new MyClass(0)) (fun _ -> printfn "Class")
+      using null (fun _ -> printfn "null")
 
-    printfn "Deferred:"
-    use _ = new MyStruct(0)
-    use _ = new MyStruct(1)
-    use _ = new MyClass(0)
-    use _ = null
+      printfn "Deferred:"
+      use _ = new MyStruct(0)
+      use _ = new MyStruct(1)
+      use _ = new MyClass(0)
+      use _ = null
 
-    printfn "Done"
-  })
+      printfn "Done"
+      invalidOp "Test exception"
+    })
+  with ex ->
+    printfn "Caught exception: %A" ex
 
 let testSequenceFunctions () =
   Dispatcher.run dispatcher (fun () -> deferred {
@@ -269,57 +281,58 @@ let testCycle () =
   })
 
 let testDSeqBuilder () =
-  Dispatcher.run dispatcher (fun () -> deferred {
-    let xs = deferredSeq {
-      yield "First"
+  try
+    Dispatcher.run dispatcher (fun () -> deferred {
+      let xs = deferredSeq {
+        yield "First"
 
-      let! x = afterMs 1000 >>| fun () -> "Waited 1s"
-      yield x
+        let! x = afterMs 1000 >>| fun () -> "Waited 1s"
+        yield x
 
-      printfn "YieldFrom:"
+        printfn "YieldFrom:"
 
-      yield! DeferredSeq.init 10 (fun i -> afterMs 100 >>| fun () -> string (i + 1))
-      if x <> "Waited 1s NOT" then
-        yield "This should be printed"
+        yield! DeferredSeq.init 10 (fun i -> afterMs 100 >>| fun () -> string (i + 1))
+        if x <> "Waited 1s NOT" then
+          yield "This should be printed"
 
-      printfn "while:"
+        printfn "while:"
 
-      let mutable i = 1
-      while (afterMs 50 >>| fun () -> i <= 10) do
-        yield string i
-        yield string (i + 10)
-        i <- i + 1
+        let mutable i = 1
+        while (afterMs 50 >>| fun () -> i <= 10) do
+          yield string i
+          yield string (i + 10)
+          i <- i + 1
 
-      printfn "for:"
+        printfn "for:"
 
-      for i in 1 .. 10 do
-        yield string i
-        yield string (i + 10)
+        for i in 1 .. 10 do
+          yield string i
+          yield string (i + 10)
 
-        try
           try
-            if i = 9 then
-              invalidOp "Raise at i = 9"
-          with ex ->
-            printfn "Caught exception: %A" ex
-            yield "Yield from exception handler"
-        finally
-          printfn "Executing finally"
+            try
+              if i = 9 then
+                invalidOp "Raise at i = 9"
+            with ex ->
+              printfn "Caught exception: %A" ex
+              yield "Yield from exception handler"
+          finally
+            printfn "Executing finally"
 
-      printfn "DSeq disposable:"
-      use _ = new MyStruct(0)
-      use _ = new MyStruct(1)
-      use _ = new MyClass(0)
-      use _ = null
+        printfn "DSeq disposable:"
+        use _ = new MyStruct(0)
+        use _ = new MyStruct(1)
+        use _ = new MyClass(0)
+        use _ = null
 
-      yield "Yielding just before raise"
-      invalidOp "Test exception"
+        yield "Yielding just before raise"
+        invalidOp "Test exception"
 
-      printfn "Done"
-    }
-    try
+        printfn "Done"
+      }
+
       for x in xs do
         printfn "%s" x
-    with ex ->
-      printfn "Caught exception: %A" ex
-  })
+    })
+  with ex ->
+    printfn "Caught exception: %A" ex

@@ -40,7 +40,9 @@ module Dispatcher =
             )
             match f with
             | Some (supervisor, f) ->
-              supervisor.Run(f) |> ignore
+              match supervisor.TryRun(f) with
+              | Result.Success () -> ()
+              | Result.Failure ex -> Supervisor.sendException supervisor ex
               loop ()
             | None ->
               d.Get()

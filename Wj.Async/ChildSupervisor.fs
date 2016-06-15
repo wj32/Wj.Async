@@ -17,7 +17,9 @@ module internal ChildSupervisor =
 
       member t.SendException(ex) =
         t.handlers |> List.iter (fun (supervisor, handler) ->
-          supervisor.Run(fun () -> handler ex) |> ignore
+          match supervisor.TryRun(fun () -> handler ex) with
+          | Result.Success () -> ()
+          | Result.Failure ex -> supervisor.SendException(ex)
         )
         match t.parent with
         | Some parent ->
@@ -38,13 +40,10 @@ module internal ChildSupervisor =
       member t.UponException(supervisedHandler) =
         t.handlers <- supervisedHandler :: t.handlers
 
-      member t.Run(f) =
+      member t.TryRun(f) =
         ThreadShared.pushSupervisor t
         let result = Result.tryWith f
         ThreadShared.popSupervisor t
-        match result with
-        | Result.Failure ex -> (t :> ISupervisor).SendException(ex)
-        | Result.Success _ -> ()
         result
 
   let inline create name =

@@ -256,7 +256,7 @@ module Deferred =
   let tryFinally (f : unit -> _ IDeferred) (finalizer : unit -> _ IDeferred) =
     let t = ChildSupervisor.create "tryFinally"
     t.Detach()
-    let result = t.Run(f)
+    let result = t.TryRun(f)
     match result with
     | Result.Success d ->
       if isDetermined d then
