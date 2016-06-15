@@ -10,17 +10,19 @@ module Queue =
       mutable tail : int;
       mutable length : int; }
 
-  let inline createWithData' data index length =
+  let inline createWithData data index length =
     { data = data;
       head = index;
       tail = index + length;
       length = length; }
 
-  let inline createWithData data = createWithData' data 0 data.Length
+  let inline createFullWithData data = createWithData data 0 data.Length
 
-  let create () = createWithData (Array.zeroCreate 2)
+  let inline createEmptyWithData data = createWithData data 0 0
 
-  let createWithCapacity capacity = createWithData (Array.zeroCreate capacity)
+  let create () = createEmptyWithData (Array.zeroCreate 2)
+
+  let createWithCapacity capacity = createEmptyWithData (Array.zeroCreate capacity)
 
   let copyTo t dest length =
     assert (length <= t.length)
@@ -115,14 +117,14 @@ module Queue =
 
   let isEmpty t = t.length = 0
 
-  let ofArray xs = createWithData (Array.copy xs)
+  let ofArray xs = createFullWithData (Array.copy xs)
 
   let toArray t =
     let xs = Array.zeroCreate t.length
     copyTo t xs t.length
     xs
 
-  let ofList xs = createWithData (List.toArray xs)
+  let ofList xs = createFullWithData (List.toArray xs)
 
   let toList t =
     if t.length = 0 then
@@ -137,7 +139,7 @@ module Queue =
           loop acc' index'
       loop [] t.tail
 
-  let ofSeq xs = createWithData (Seq.toArray xs)
+  let ofSeq xs = createFullWithData (Seq.toArray xs)
 
   let toSeq t =
     if t.length = 0 then
@@ -171,7 +173,7 @@ module Queue =
   let inline createIter f t =
     let data = Array.zeroCreate t.length
     let length = t |> foldInline (fun i x -> f data i x) 0
-    createWithData' data 0 length
+    createWithData data 0 length
 
   let map f t = t |> createIter (fun data i x -> data.[i] <- f x; i + 1)
 
