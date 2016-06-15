@@ -38,12 +38,7 @@ module Queue =
 
   let ensureCapacity t requiredCapacity =
     if t.data.Length < requiredCapacity then
-      let newCapacity =
-        let doubled = t.data.Length * 2
-        if doubled < requiredCapacity then
-          requiredCapacity
-        else
-          doubled
+      let newCapacity = max (t.data.Length * 2) requiredCapacity
       let newData = Array.zeroCreate newCapacity
       copyTo t newData t.length
       t.data <- newData
@@ -168,7 +163,7 @@ module Queue =
 
   let fold f state t = foldInline f state t
 
-  let iter f t = t |> fold (fun () x -> f x) ()
+  let iter f t = t |> foldInline (fun () x -> f x) ()
 
   let inline createIter f t =
     let data = Array.zeroCreate t.length
