@@ -62,7 +62,7 @@ module DeferredSeq =
 
   let fold' f state xs = foldInline' f state xs
 
-  let inline foldInline f state xs = foldGeneric ((|>)) f state xs
+  let inline foldInline f state xs = foldGeneric (|>) f state xs
 
   let fold f state xs = foldInline f state xs
 
@@ -200,4 +200,12 @@ module DeferredSeq =
 
   let ofSeq xs = create (fun writer -> xs |> Seq.iter (Writer.write writer); Writer.close writer)
 
-  let toSeq xs = toSystemList (fun list -> list :> _ seq) xs
+  let toSeq xs =
+    xs |> iterInline (fun x -> ())
+    >>| fun () -> seq {
+      let mutable tail = xs
+      while Deferred.isDetermined tail do
+        match Deferred.get tail with
+        | Empty -> tail <- Deferred.never ()
+        | Cons (head, tail') -> yield head; tail <- tail'
+    }

@@ -5,7 +5,6 @@ module DeferredSeq =
   and 'a Next =
     | Empty
     | Cons of head : 'a * tail : 'a T
-
   type 'a DSeq = 'a T
 
   // Writer
