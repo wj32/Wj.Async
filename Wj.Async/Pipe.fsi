@@ -15,6 +15,8 @@ module Pipe =
 
   [<Interface>]
   type 'a IWriter =
+    inherit ('a IPipe)
+
     abstract member Close : unit -> unit
     abstract member WriteAccepted : unit IDeferred
     abstract member Write : value : 'a -> unit IDeferred
@@ -24,6 +26,8 @@ module Pipe =
 
   [<Interface>]
   type 'a IReader =
+    inherit ('a IPipe)
+
     abstract member CloseReader : unit -> unit
     abstract member Available : unit -> unit option IDeferred
     abstract member Read : unit -> 'a option IDeferred
@@ -41,9 +45,9 @@ module Pipe =
   val inline close : 'a IWriter -> unit
   val inline writeAccepted : 'a IWriter -> unit IDeferred
   val inline write : 'a IWriter -> value : 'a -> unit IDeferred
-  val inline writeBatch : 'a IWriter -> values : 'a seq -> unit IDeferred
+  val inline writeBatch : 'a IWriter -> values : 'a array -> unit IDeferred
   val inline writeImmediately : 'a IWriter -> value : 'a -> unit
-  val inline writeBatchImmediately : 'a IWriter -> values : 'a seq -> unit
+  val inline writeBatchImmediately : 'a IWriter -> values : 'a array -> unit
   // IReader functions
   val inline closeReader : 'a IReader -> unit
   val inline available : 'a IReader -> unit option IDeferred
@@ -78,7 +82,8 @@ module Pipe =
   val transferBatch : batchSize : BatchSize.T -> mapping : ('a array -> IDeferred<#seq<'b>>) -> writer : 'b IWriter -> reader : 'a IReader -> unit IDeferred
   val transfer' : mapping : ('a -> 'b IDeferred) -> writer : 'b IWriter -> reader : 'a IReader -> unit IDeferred
   val transfer : mapping : ('a -> 'b) -> writer : 'b IWriter -> reader : 'a IReader -> unit IDeferred
-  val readAll : reader : 'a IReader -> 'a Queue.T IDeferred
+  val transferId : writer : 'a IWriter -> reader : 'a IReader -> unit IDeferred
+  val readAll : reader : 'a IReader -> 'a array IDeferred
   val drain : reader : 'a IReader -> int IDeferred
   val concat : readers : 'a IReader list -> 'a IReader
   val append : reader1 : 'a IReader -> reader2 : 'a IReader -> 'a IReader

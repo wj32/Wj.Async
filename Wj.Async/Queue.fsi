@@ -1,4 +1,4 @@
-﻿namespace Wj.Async
+﻿namespace Wj.Async.Internal
 
 module Queue =
   type 'a T

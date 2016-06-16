@@ -137,8 +137,8 @@ module DeferredSeq =
   let interleave (xss : _ T T) =
     create (fun writer ->
       let mutable active = 1
-      let increment () = active <- active + 1
-      let decrement () = active <- active - 1; if active = 0 then Writer.close writer
+      let inline increment () = active <- active + 1
+      let inline decrement () = active <- active - 1; if active = 0 then Writer.close writer
       xss |> iterInline (fun xs ->
         increment ()
         xs |> iterInline (Writer.write writer) >>> decrement

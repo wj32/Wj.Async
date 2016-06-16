@@ -1,5 +1,7 @@
 ﻿namespace Wj.Async
 
+open Wj.Async.Internal
+
 [<Interface>]
 type 'a IPipe =
   abstract member Closed : unit IDeferred
@@ -24,6 +26,8 @@ module Pipe =
 
   [<Interface>]
   type 'a IWriter =
+    inherit ('a IPipe)
+
     abstract member Close : unit -> unit
     abstract member WriteAccepted : unit IDeferred
     abstract member Write : value : 'a -> unit IDeferred
@@ -33,6 +37,8 @@ module Pipe =
 
   [<Interface>]
   type 'a IReader =
+    inherit ('a IPipe)
+
     abstract member CloseReader : unit -> unit
     abstract member Available : unit -> unit option IDeferred
     abstract member Read : unit -> 'a option IDeferred
@@ -74,8 +80,6 @@ module Pipe =
       mutable writeAccepted : unit IVar;
       pendingReads : 'a PendingRead.T Queue.T; }
 
-    member inline t.IsClosedInternal = Deferred.isDetermined t.closed
-
     member t.CancelReads() =
       while not (Queue.isEmpty t.pendingReads) do
         match Queue.dequeue t.pendingReads with
@@ -84,7 +88,7 @@ module Pipe =
         | PendingRead.Batch (b, v) -> None --> v
 
     member inline t.CloseInternal() =
-      if not t.IsClosedInternal then
+      if not (isClosed t) then
         () --> t.closed
         t.CancelReads()
         t.UpdateWriteAccepted()
@@ -100,14 +104,14 @@ module Pipe =
         | PendingRead.Batch (b, v) -> Some (Queue.dequeue' t.buffer (BatchSize.toInt b)) --> v
 
     member t.UpdateWriteAccepted() =
-      if Queue.length t.buffer < t.capacity || t.IsClosedInternal then
+      if Queue.length t.buffer < t.capacity || isClosed t then
         Deferred.trySet t.writeAccepted () |> ignore
       else
         if Deferred.isDetermined t.writeAccepted then
           t.writeAccepted <- Deferred.createVar ()
 
     member inline t.WriteImmediatelyInternal(f) =
-      if t.IsClosedInternal then
+      if isClosed t then
         raise (new System.OperationCanceledException(PipeClosed))
       f ()
       t.CompleteReads()
@@ -115,7 +119,7 @@ module Pipe =
 
     member inline t.ReadInternal(pendingRead, dequeue) =
       if Queue.isEmpty t.buffer then
-        if t.IsClosedInternal then
+        if isClosed t then
           Deferred.value None
         else
           Deferred.create (fun v -> Queue.enqueue t.pendingReads (pendingRead v))
@@ -135,22 +139,22 @@ module Pipe =
     interface 'a IPipe with
       member t.Closed = t.closed :> _ IDeferred
 
-      member t.IsClosed = t.IsClosedInternal
+      member t.IsClosed = Deferred.isDetermined t.closed
 
       member t.Length = Queue.length t.buffer
 
       member t.Capacity
         with get() = t.capacity
-        and set(value) = t.capacity <- value
+        and set(value) = t.capacity <- value; t.UpdateWriteAccepted()
 
     interface 'a IWriter with
       member t.Close() = t.CloseInternal() |> ignore
 
       member t.WriteAccepted = t.writeAccepted :> _ IDeferred
 
-      member t.Write(x) = (t :> _ IWriter).WriteImmediately(x); t.writeAccepted :> _ IDeferred
+      member t.Write(x) = writeImmediately t x; t.writeAccepted :> _ IDeferred
 
-      member t.WriteBatch(xs) = (t :> _ IWriter).WriteBatchImmediately(xs); t.writeAccepted :> _ IDeferred
+      member t.WriteBatch(xs) = writeBatchImmediately t xs; t.writeAccepted :> _ IDeferred
 
       member t.WriteImmediately(x) = t.WriteImmediatelyInternal(fun () -> Queue.enqueue t.buffer x)
 
@@ -203,33 +207,162 @@ module Pipe =
 
   // Sequence processing
 
-  let foldBatch b f state t = ()
-  let fold' f state t = ()
-  let fold f state t = ()
-  let iterBatch b f t = ()
-  let iter' f t = ()
-  let iter f t = ()
-  let mapBatch b f t = ()
-  let map' f t = ()
-  let map f t = ()
-  let collect f t = ()
-  let choose f t = ()
-  let filter f t = ()
+  let inline foldGeneric upon read f state =
+    Deferred.create (fun v ->
+      let rec loop state =
+        read ()
+        >>> function
+        | Some x -> upon (f state x) loop
+        | None -> state --> v
+      Deferred.unit >>> fun () -> loop state
+    )
+
+  let inline foldBatchInline b (f : _ -> _ -> _ IDeferred) state t =
+    foldGeneric Deferred.upon (fun () -> readBatch t b) f state
+
+  let foldBatch b f state t = foldBatchInline b f state t
+
+  let inline foldInline' (f : _ -> _ -> _ IDeferred) state t =
+    foldGeneric Deferred.upon (fun () -> read t) f state
+
+  let fold' f state t = foldInline' f state t
+
+  let inline foldInline f state t = foldGeneric (|>) (fun () -> read t) f state
+
+  let fold f state t = foldInline f state t
+
+  let iterBatch b f t = foldBatchInline b (fun () xs -> f xs) () t
+
+  let iter' f t = foldInline' (fun () x -> f x) () t
+
+  let inline iterInline f t = foldInline (fun () x -> f x) () t
+
+  let iter f t = iterInline f t
+
+  let inline createIterGeneric readImmediately f writer reader =
+    Deferred.create (fun v ->
+      let inline complete () = () --> v
+      let inline closeReaderAndComplete () = closeReader reader; complete ()
+      let rec loop () =
+        if isClosed writer then
+          closeReaderAndComplete ()
+        else
+          match readImmediately () with
+          | Some x -> f x >>> loop
+          | None ->
+            if isClosed reader then
+              complete ()
+            else
+              Deferred.choose
+                [ Deferred.choice (available reader) ignore;
+                  Deferred.choice (closed writer) ignore; ]
+              >>> loop
+      Deferred.unit >>> loop
+    )
+
+  let inline seqToArrayReadOnly (s : _ seq) =
+    match s with
+    | :? (_ array) as s -> s
+    | _ -> Seq.toArray s
+
+  let mapBatch b (f : _ -> _ IDeferred) t =
+    createReader (fun writer ->
+      createIterGeneric (fun () -> readBatchImmediately t b) (fun xs ->
+        f xs >>= fun ys -> writeBatch writer (seqToArrayReadOnly ys)
+      ) writer t
+    )
+
+  let map' (f : _ -> _ IDeferred) t =
+    createReader (fun writer ->
+      createIterGeneric (fun () -> readImmediately t) (fun x -> f x >>= write writer) writer t
+    )
+
+  let map f t =
+    createReader (fun writer ->
+      createIterGeneric (fun () -> readImmediately t) (f >> write writer) writer t
+    )
+
+  let collect (f : _ -> _ IDeferred) t =
+    createReader (fun writer ->
+      createIterGeneric (fun () -> readImmediately t) (fun x ->
+        f x >>= (fun ys -> writeBatch writer (seqToArrayReadOnly ys))
+      ) writer t
+    )
+
+  let choose (f : _ -> _ IDeferred) t =
+    createReader (fun writer ->
+      createIterGeneric (fun () -> readImmediately t) (fun x ->
+        f x
+        >>= function
+        | Some y -> write writer y
+        | None -> Deferred.unit
+      ) writer t
+    )
+
+  let filter (f : _ -> _ IDeferred) t =
+    createReader (fun writer ->
+      createIterGeneric (fun () -> readImmediately t) (fun x ->
+        f x
+        >>= function
+        | true -> write writer x
+        | false -> Deferred.unit
+      ) writer t
+    )
 
   // General
 
-  let transferBatch b f writer reader = ()
-  let transfer' f writer reader = ()
-  let transfer f writer reader = ()
-  let drain t = ()
-  let concat ts = ()
-  let append t1 t2 = ()
-  let interleave ts = ()
-  let interleavePipe tt = ()
+  let transferBatch b (f : _ -> _ IDeferred) writer reader =
+    createIterGeneric (fun () -> readBatchImmediately reader b) (fun xs ->
+      f xs >>= fun ys -> writeBatch writer (seqToArrayReadOnly ys)
+    ) writer reader
 
-  let ofArray xs = ()
-  let toArray t = ()
-  let ofList xs = ()
-  let toList t = ()
-  let ofSeq xs = ()
-  let toSeq t = ()
+  let transfer' (f : _ -> _ IDeferred) writer reader =
+    createIterGeneric (fun () -> readImmediately reader) (fun x -> f x >>= write writer) writer reader
+
+  let transfer f writer reader =
+    createIterGeneric (fun () -> readImmediately reader) (f >> write writer) writer reader
+
+  let transferId writer reader =
+    createIterGeneric (fun () -> readImmediately reader) (write writer) writer reader
+
+  let inline readAllSystemList cast t =
+    let list = new System.Collections.Generic.List<_>()
+    let result = cast list
+    let resultNow = Deferred.value result
+    foldBatchInline BatchSize.Unlimited (fun _ xs -> list.AddRange(xs); resultNow) result t
+
+  let readAll t = readAllSystemList id t >>| fun list -> list.ToArray()
+
+  let drain t = foldBatchInline BatchSize.Unlimited (fun n xs -> Deferred.value (n + xs.Length)) 0 t
+
+  let concat (ts : _ IReader list) =
+    createReader (fun writer -> Deferred.List.iter Parallelism.Sequential (transferId writer) ts)
+
+  let append t1 t2 = createReader (fun writer -> transferId writer t1 >>= fun () -> transferId writer t2)
+
+  let inline interleaveGeneric upon iter ts =
+    let (writer, reader) = create ()
+    let mutable active = 1
+    let inline increment () = active <- active + 1
+    let inline decrement () = active <- active - 1; if active = 0 then close writer
+    upon (iter (fun t ->
+      increment ()
+      transferId writer t >>> decrement
+    ) ts) decrement
+    reader
+
+  let interleave (ts : _ IReader list) = interleaveGeneric (|>) List.iter ts
+
+  let interleavePipe (tt : _ IReader IReader) = interleaveGeneric Deferred.upon iterInline tt
+
+  let ofArray xs = createReader (fun writer -> writeBatch writer xs)
+
+  let toArray t = readAllSystemList id t >>| fun list -> list.ToArray()
+
+  let ofList xs = createReader (fun writer -> writeBatch writer (List.toArray xs))
+
+  let toList t = readAllSystemList id t >>| Seq.toList
+
+  let ofSeq xs = createReader (fun writer -> writeBatch writer (Seq.toArray xs))
+
+  let toSeq t = readAllSystemList (fun list -> list :> _ seq) t

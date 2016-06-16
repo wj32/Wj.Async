@@ -1,6 +1,7 @@
 ﻿namespace Wj.Async
 
-open System.Threading;
+open System.Threading
+open Wj.Async.Internal
 
 module Dispatcher =
   // IDispatcher functions
