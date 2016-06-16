@@ -74,6 +74,7 @@
     <Compile Include="DeferredSeqBuilder.fsi" />
     <Compile Include="DeferredSeqBuilder.fs" />
     <Compile Include="Pipe.fsi" />
+    <Compile Include="Pipe.fs" />
     <Compile Include="Operators.fs" />
     <None Include="Script.fsx" />
   </ItemGroup>
