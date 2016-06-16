@@ -41,25 +41,25 @@ module Pipe =
     abstract member ReadBatchImmediately : batchSize : BatchSize.T -> 'a array option
 
   // IPipe functions
-  let closed (t : _ IPipe) = t.Closed
-  let isClosed (t : _ IPipe) = t.IsClosed
-  let length (t : _ IPipe) = t.Length
-  let capacity (t : _ IPipe) = t.Capacity
-  let setCapacity (t : _ IPipe) capacity = t.Capacity <- capacity
+  let inline closed (t : _ IPipe) = t.Closed
+  let inline isClosed (t : _ IPipe) = t.IsClosed
+  let inline length (t : _ IPipe) = t.Length
+  let inline capacity (t : _ IPipe) = t.Capacity
+  let inline setCapacity (t : _ IPipe) capacity = t.Capacity <- capacity
   // IWriter functions
-  let close (t : _ IWriter) = t.Close()
-  let writeAccepted (t : _ IWriter) = t.WriteAccepted
-  let write (t : _ IWriter) x = t.Write(x)
-  let writeBatch (t : _ IWriter) xs = t.WriteBatch(xs)
-  let writeImmediately (t : _ IWriter) x = t.WriteImmediately(x)
-  let writeBatchImmediately (t : _ IWriter) xs = t.WriteBatchImmediately(xs)
+  let inline close (t : _ IWriter) = t.Close()
+  let inline writeAccepted (t : _ IWriter) = t.WriteAccepted
+  let inline write (t : _ IWriter) x = t.Write(x)
+  let inline writeBatch (t : _ IWriter) xs = t.WriteBatch(xs)
+  let inline writeImmediately (t : _ IWriter) x = t.WriteImmediately(x)
+  let inline writeBatchImmediately (t : _ IWriter) xs = t.WriteBatchImmediately(xs)
   // IReader functions
-  let closeReader (t : _ IReader) = t.CloseReader()
-  let available (t : _ IReader) = t.Available()
-  let read (t : _ IReader) = t.Read()
-  let readBatch (t : _ IReader) b = t.ReadBatch(b)
-  let readImmediately (t : _ IReader) = t.ReadImmediately()
-  let readBatchImmediately (t : _ IReader) b = t.ReadBatchImmediately(b)
+  let inline closeReader (t : _ IReader) = t.CloseReader()
+  let inline available (t : _ IReader) = t.Available()
+  let inline read (t : _ IReader) = t.Read()
+  let inline readBatch (t : _ IReader) b = t.ReadBatch(b)
+  let inline readImmediately (t : _ IReader) = t.ReadImmediately()
+  let inline readBatchImmediately (t : _ IReader) b = t.ReadBatchImmediately(b)
 
   module PendingRead =
     type 'a T =

@@ -2,19 +2,19 @@
 
 module Deferred =
   // IDeferred functions
-  val upon : 'a IDeferred -> callback : ('a -> unit) -> unit
-  val upon' : 'a IDeferred -> supervisedCallback : 'a SupervisedCallback -> unit
-  val register : 'a IDeferred -> callback : ('a -> unit) -> IRegistration
-  val register' : 'a IDeferred -> supervisedCallback : 'a SupervisedCallback -> IRegistration
-  val moveFrom : 'a IDeferred -> from : 'a SupervisedCallback RegistrationList.T -> unit
-  val isDetermined : 'a IDeferred -> bool
-  val get : 'a IDeferred -> 'a
-  val tryGet : 'a IDeferred -> 'a option
+  val inline upon : 'a IDeferred -> callback : ('a -> unit) -> unit
+  val inline upon' : 'a IDeferred -> supervisedCallback : 'a SupervisedCallback -> unit
+  val inline register : 'a IDeferred -> callback : ('a -> unit) -> IRegistration
+  val inline register' : 'a IDeferred -> supervisedCallback : 'a SupervisedCallback -> IRegistration
+  val inline moveFrom : 'a IDeferred -> from : 'a SupervisedCallback RegistrationList.T -> unit
+  val inline isDetermined : 'a IDeferred -> bool
+  val inline get : 'a IDeferred -> 'a
+  val inline tryGet : 'a IDeferred -> 'a option
   // IVar functions
-  val set : 'a IVar -> value : 'a -> unit
-  val trySet : 'a IVar -> value : 'a -> bool
-  val link : 'a IVar -> parent : 'a IDeferred -> unit
-  val tryLink : 'a IVar -> parent : 'a IDeferred -> bool
+  val inline set : 'a IVar -> value : 'a -> unit
+  val inline trySet : 'a IVar -> value : 'a -> bool
+  val inline link : 'a IVar -> parent : 'a IDeferred -> unit
+  val inline tryLink : 'a IVar -> parent : 'a IDeferred -> bool
 
   // Creation
 

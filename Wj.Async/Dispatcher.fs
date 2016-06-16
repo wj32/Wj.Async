@@ -4,9 +4,9 @@ open System.Threading;
 
 module Dispatcher =
   // IDispatcher functions
-  let enqueue (t : IDispatcher) supervisedCallback = t.Enqueue(supervisedCallback)
-  let run (t : IDispatcher) f = t.Run(f)
-  let rootSupervisor (t : IDispatcher) = t.RootSupervisor
+  let inline enqueue (t : IDispatcher) supervisedCallback = t.Enqueue(supervisedCallback)
+  let inline run (t : IDispatcher) f = t.Run(f)
+  let inline rootSupervisor (t : IDispatcher) = t.RootSupervisor
 
   [<ReferenceEquality>]
   type T =

@@ -32,25 +32,25 @@ module Pipe =
     abstract member ReadBatchImmediately : batchSize : BatchSize.T -> 'a array option
 
   // IPipe functions
-  val closed : 'a IPipe -> unit IDeferred
-  val isClosed : 'a IPipe -> bool
-  val length : 'a IPipe -> int
-  val capacity : 'a IPipe -> int
-  val setCapacity : 'a IPipe -> capacity : int -> unit
+  val inline closed : 'a IPipe -> unit IDeferred
+  val inline isClosed : 'a IPipe -> bool
+  val inline length : 'a IPipe -> int
+  val inline capacity : 'a IPipe -> int
+  val inline setCapacity : 'a IPipe -> capacity : int -> unit
   // IWriter functions
-  val close : 'a IWriter -> unit
-  val writeAccepted : 'a IWriter -> unit IDeferred
-  val write : 'a IWriter -> value : 'a -> unit IDeferred
-  val writeBatch : 'a IWriter -> values : 'a seq -> unit IDeferred
-  val writeImmediately : 'a IWriter -> value : 'a -> unit
-  val writeBatchImmediately : 'a IWriter -> values : 'a seq -> unit
+  val inline close : 'a IWriter -> unit
+  val inline writeAccepted : 'a IWriter -> unit IDeferred
+  val inline write : 'a IWriter -> value : 'a -> unit IDeferred
+  val inline writeBatch : 'a IWriter -> values : 'a seq -> unit IDeferred
+  val inline writeImmediately : 'a IWriter -> value : 'a -> unit
+  val inline writeBatchImmediately : 'a IWriter -> values : 'a seq -> unit
   // IReader functions
-  val closeReader : 'a IReader -> unit
-  val available : 'a IReader -> unit option IDeferred
-  val read : 'a IReader -> 'a option IDeferred
-  val readBatch : 'a IReader -> batchSize : BatchSize.T -> 'a array option IDeferred
-  val readImmediately : 'a IReader -> 'a option
-  val readBatchImmediately : 'a IReader -> batchSize : BatchSize.T -> 'a array option
+  val inline closeReader : 'a IReader -> unit
+  val inline available : 'a IReader -> unit option IDeferred
+  val inline read : 'a IReader -> 'a option IDeferred
+  val inline readBatch : 'a IReader -> batchSize : BatchSize.T -> 'a array option IDeferred
+  val inline readImmediately : 'a IReader -> 'a option
+  val inline readBatchImmediately : 'a IReader -> batchSize : BatchSize.T -> 'a array option
 
   // Creation
 

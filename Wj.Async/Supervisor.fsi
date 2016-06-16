@@ -4,14 +4,14 @@ open System
 
 module Supervisor =
   // ISupervisor functions
-  val dispatcher : ISupervisor -> IDispatcher
-  val parent : ISupervisor -> ISupervisor option
-  val name : ISupervisor -> string
-  val detach : ISupervisor -> unit
-  val sendException : ISupervisor -> ex : exn -> unit
-  val uponException : ISupervisor -> handler : (exn -> unit) -> unit
-  val uponException' : ISupervisor -> supervisedHandler : exn SupervisedCallback -> unit
-  val tryRun : ISupervisor -> f : (unit -> 'a) -> Result.T<'a, exn>
+  val inline dispatcher : ISupervisor -> IDispatcher
+  val inline parent : ISupervisor -> ISupervisor option
+  val inline name : ISupervisor -> string
+  val inline detach : ISupervisor -> unit
+  val inline sendException : ISupervisor -> ex : exn -> unit
+  val inline uponException : ISupervisor -> handler : (exn -> unit) -> unit
+  val inline uponException' : ISupervisor -> supervisedHandler : exn SupervisedCallback -> unit
+  val inline tryRun : ISupervisor -> f : (unit -> 'a) -> Result.T<'a, exn>
 
   val current : unit -> ISupervisor
   val create : unit -> ISupervisor

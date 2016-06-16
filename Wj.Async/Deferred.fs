@@ -8,19 +8,19 @@ module Deferred =
   let [<Literal>] VarAlreadySetOrLinked = "The variable is already set or linked."
 
   // IDeferred functions
-  let upon (t : _ IDeferred) (f : _ -> unit) = t.Upon(f)
-  let upon' (t : _ IDeferred) (supervisedCallback : _ SupervisedCallback) = t.Upon(supervisedCallback)
-  let register (t : _ IDeferred) (f : _ -> unit) = t.Register(f)
-  let register' (t : _ IDeferred) (supervisedCallback : _ SupervisedCallback) = t.Register(supervisedCallback)
-  let moveFrom (t : _ IDeferred) from = t.MoveFrom(from)
-  let isDetermined (t : _ IDeferred) = t.IsDetermined
-  let get (t : _ IDeferred) = t.Get()
-  let tryGet (t : _ IDeferred) = t.TryGet()
+  let inline upon (t : _ IDeferred) (f : _ -> unit) = t.Upon(f)
+  let inline upon' (t : _ IDeferred) (supervisedCallback : _ SupervisedCallback) = t.Upon(supervisedCallback)
+  let inline register (t : _ IDeferred) (f : _ -> unit) = t.Register(f)
+  let inline register' (t : _ IDeferred) (supervisedCallback : _ SupervisedCallback) = t.Register(supervisedCallback)
+  let inline moveFrom (t : _ IDeferred) from = t.MoveFrom(from)
+  let inline isDetermined (t : _ IDeferred) = t.IsDetermined
+  let inline get (t : _ IDeferred) = t.Get()
+  let inline tryGet (t : _ IDeferred) = t.TryGet()
   // IVar functions
-  let set (t : _ IVar) x = t.Set(x)
-  let trySet (t : _ IVar) x = t.TrySet(x)
-  let link (t : _ IVar) d = t.Link(d)
-  let tryLink (t : _ IVar) d = t.TryLink(d)
+  let inline set (t : _ IVar) x = t.Set(x)
+  let inline trySet (t : _ IVar) x = t.TrySet(x)
+  let inline link (t : _ IVar) d = t.Link(d)
+  let inline tryLink (t : _ IVar) d = t.TryLink(d)
 
   let enqueue (supervisor : ISupervisor) f x =
     supervisor.Dispatcher.Enqueue((supervisor, fun () -> f x))

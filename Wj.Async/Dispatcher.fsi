@@ -2,9 +2,9 @@
 
 module Dispatcher =
   // IDispatcher functions
-  val enqueue : IDispatcher -> supervisedCallback : unit SupervisedCallback -> unit
-  val run : IDispatcher -> f : (unit -> 'a IDeferred) -> 'a
-  val rootSupervisor : IDispatcher -> ISupervisor
+  val inline enqueue : IDispatcher -> supervisedCallback : unit SupervisedCallback -> unit
+  val inline run : IDispatcher -> f : (unit -> 'a IDeferred) -> 'a
+  val inline rootSupervisor : IDispatcher -> ISupervisor
 
   val current : unit -> IDispatcher
   val create : unit -> IDispatcher

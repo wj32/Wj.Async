@@ -6,15 +6,15 @@ module Supervisor =
   let [<Literal>] CannotAddHandlerToRoot = "Handlers cannot be registered on the root supervisor."
 
   // ISupervisor functions
-  let dispatcher (t : ISupervisor) = t.Dispatcher
-  let parent (t : ISupervisor) = t.Parent
-  let name (t : ISupervisor) = t.Name
-  let detach (t : ISupervisor) = t.Detach()
-  let sendException (t : ISupervisor) ex = t.SendException(ex)
-  let uponException (t : ISupervisor) (handler : exn -> unit) = t.UponException(handler)
-  let uponException' (t : ISupervisor) (supervisedHandler : exn SupervisedCallback) =
+  let inline dispatcher (t : ISupervisor) = t.Dispatcher
+  let inline parent (t : ISupervisor) = t.Parent
+  let inline name (t : ISupervisor) = t.Name
+  let inline detach (t : ISupervisor) = t.Detach()
+  let inline sendException (t : ISupervisor) ex = t.SendException(ex)
+  let inline uponException (t : ISupervisor) (handler : exn -> unit) = t.UponException(handler)
+  let inline uponException' (t : ISupervisor) (supervisedHandler : exn SupervisedCallback) =
     t.UponException(supervisedHandler)
-  let tryRun (t : ISupervisor) f = t.TryRun(f)
+  let inline tryRun (t : ISupervisor) f = t.TryRun(f)
 
   module Child = ChildSupervisor
 
