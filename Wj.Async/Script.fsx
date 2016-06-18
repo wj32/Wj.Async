@@ -15,9 +15,10 @@
 #load "DeferredSeq.fs"
 #load "Supervisor.fs"
 #load "Dispatcher.fs"
+#load "Clock.fs"
 #load "DeferredBuilder.fs"
 #load "DeferredSeqBuilder.fs"
-#load "Clock.fs"
+#load "Pipe.fs"
 #load "Operators.fs"
 
 open Wj.Async
@@ -336,3 +337,41 @@ let testDSeqBuilder () =
     })
   with ex ->
     printfn "Caught exception: %A" ex
+
+let testPipe () =
+  let r = new System.Random()
+  Dispatcher.run dispatcher (fun () -> deferred {
+    let primesReader = Pipe.createReader (fun writer -> deferred {
+      let isPrime n =
+        let limit = int (sqrt (double n))
+        let rec loop i =
+          if i > limit then
+            true
+          else if n % i = 0 then
+            false
+          else
+            loop (i + 2)
+        if n = 1 || n % 2 = 0 then
+          false
+        else
+          loop 3
+      for i = 1 to 200 do
+        if isPrime i then
+          do! Pipe.write writer (i, true)
+          do! afterMs (r.Next(500))
+        else
+          Pipe.writeImmediately writer (i, false)
+    })
+    let printer id = deferred {
+      let mutable count = 0
+      do! primesReader |> Pipe.iterBatch (Pipe.BatchSize.AtMost 3) (fun xs ->
+        xs |> Array.iter (fun (n, p) ->
+          printfn "[%d]: %d (%s)" id n (if p then "PRIME" else "NOT PRIME")
+          count <- count + 1
+        )
+        afterMs (r.Next(500))
+      )
+      printfn "[%d]: Printed %d elements." id count
+    }
+    do! Deferred.allUnit [printer 1; printer 2]
+  })
