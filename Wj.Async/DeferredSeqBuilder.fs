@@ -9,7 +9,7 @@ module DeferredSeqBuilder =
   type 'a M = 'a DeferredSeq.Writer.T -> unit IDeferred
 
   type B() =
-    member inline this.Bind(d, f : _ -> _ M) = fun writer -> d >>= (fun x -> (f x) writer)
+    member inline this.Bind(d, f : _ -> _ M) = fun writer -> d >>= (fun x -> f x writer)
 
     member inline this.Combine(m1 : _ M, m2 : _ M) = fun writer -> m1 writer >>= fun () -> m2 writer
 
@@ -44,8 +44,8 @@ module DeferredSeqBuilder =
         if b then
           let v = Deferred.createVar ()
           let rec loop () =
-            Deferred.upon (body writer) (fun () ->
-              upon (guard ()) (fun b -> if b then loop () else Deferred.set v ())
+            body writer >>> (fun () ->
+              upon (guard ()) (fun b -> if b then loop () else () --> v)
             )
           loop ()
           v :> _ IDeferred
