@@ -29,7 +29,7 @@ module Pipe =
     inherit ('a IPipe)
 
     abstract member Close : unit -> unit
-    abstract member WriteAccepted : unit IDeferred
+    abstract member AcceptingWrite : unit IDeferred
     abstract member Write : value : 'a -> unit IDeferred
     abstract member WriteBatch : values : 'a array -> unit IDeferred
     abstract member WriteImmediately : value : 'a -> unit
@@ -54,7 +54,7 @@ module Pipe =
   let inline setCapacity (t : _ IPipe) capacity = t.Capacity <- capacity
   // IWriter functions
   let inline close (t : _ IWriter) = t.Close()
-  let inline writeAccepted (t : _ IWriter) = t.WriteAccepted
+  let inline acceptingWrite (t : _ IWriter) = t.AcceptingWrite
   let inline write (t : _ IWriter) x = t.Write(x)
   let inline writeBatch (t : _ IWriter) xs = t.WriteBatch(xs)
   let inline writeImmediately (t : _ IWriter) x = t.WriteImmediately(x)
@@ -77,7 +77,7 @@ module Pipe =
     { buffer : 'a Queue.T;
       closed : unit IVar;
       mutable capacity : int;
-      mutable writeAccepted : unit IVar;
+      mutable acceptingWrite : unit IVar;
       pendingReads : 'a PendingRead.T Queue.T; }
 
     member t.CancelReads() =
@@ -91,7 +91,7 @@ module Pipe =
       if not (isClosed t) then
         () --> t.closed
         t.CancelReads()
-        t.UpdateWriteAccepted()
+        t.UpdateAcceptingWrite()
         true
       else
         false
@@ -103,19 +103,19 @@ module Pipe =
         | PendingRead.Single v -> Some (Queue.dequeue t.buffer) --> v
         | PendingRead.Batch (b, v) -> Some (Queue.dequeue' t.buffer (BatchSize.toInt b)) --> v
 
-    member t.UpdateWriteAccepted() =
+    member t.UpdateAcceptingWrite() =
       if Queue.length t.buffer < t.capacity || isClosed t then
-        Deferred.trySet t.writeAccepted () |> ignore
+        Deferred.trySet t.acceptingWrite () |> ignore
       else
-        if Deferred.isDetermined t.writeAccepted then
-          t.writeAccepted <- Deferred.createVar ()
+        if Deferred.isDetermined t.acceptingWrite then
+          t.acceptingWrite <- Deferred.createVar ()
 
     member inline t.WriteImmediatelyInternal(f) =
       if isClosed t then
         raise (new System.OperationCanceledException(PipeClosed))
       f ()
       t.CompleteReads()
-      t.UpdateWriteAccepted()
+      t.UpdateAcceptingWrite()
 
     member inline t.ReadInternal(pendingRead, dequeue) =
       if Queue.isEmpty t.buffer then
@@ -125,7 +125,7 @@ module Pipe =
           Deferred.create (fun v -> Queue.enqueue t.pendingReads (pendingRead v))
       else
         let result = Deferred.value (dequeue ())
-        t.UpdateWriteAccepted()
+        t.UpdateAcceptingWrite()
         result
 
     member inline t.ReadImmediatelyInternal(dequeue) =
@@ -133,7 +133,7 @@ module Pipe =
         None
       else
         let result = Some (dequeue ())
-        t.UpdateWriteAccepted()
+        t.UpdateAcceptingWrite()
         result
 
     interface 'a IPipe with
@@ -145,16 +145,16 @@ module Pipe =
 
       member t.Capacity
         with get() = t.capacity
-        and set(value) = t.capacity <- value; t.UpdateWriteAccepted()
+        and set(value) = t.capacity <- value; t.UpdateAcceptingWrite()
 
     interface 'a IWriter with
       member t.Close() = t.CloseInternal() |> ignore
 
-      member t.WriteAccepted = t.writeAccepted :> _ IDeferred
+      member t.AcceptingWrite = t.acceptingWrite :> _ IDeferred
 
-      member t.Write(x) = writeImmediately t x; t.writeAccepted :> _ IDeferred
+      member t.Write(x) = writeImmediately t x; t.acceptingWrite :> _ IDeferred
 
-      member t.WriteBatch(xs) = writeBatchImmediately t xs; t.writeAccepted :> _ IDeferred
+      member t.WriteBatch(xs) = writeBatchImmediately t xs; t.acceptingWrite :> _ IDeferred
 
       member t.WriteImmediately(x) = t.WriteImmediatelyInternal(fun () -> Queue.enqueue t.buffer x)
 
@@ -167,7 +167,7 @@ module Pipe =
         else
           Queue.clear t.buffer
           if not (t.CloseInternal()) then
-            t.UpdateWriteAccepted()
+            t.UpdateAcceptingWrite()
 
       member t.Available() = t.ReadInternal(PendingRead.Nothing, fun () -> Some ())
 
@@ -186,9 +186,9 @@ module Pipe =
       { buffer = Queue.create ();
         closed = Deferred.createVar ();
         capacity = System.Int32.MaxValue;
-        writeAccepted = Deferred.createVar ();
+        acceptingWrite = Deferred.createVar ();
         pendingReads = Queue.create (); }
-    () --> pipe.writeAccepted
+    () --> pipe.acceptingWrite
     pipe
 
   let create () =

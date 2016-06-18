@@ -18,7 +18,7 @@ module Pipe =
     inherit ('a IPipe)
 
     abstract member Close : unit -> unit
-    abstract member WriteAccepted : unit IDeferred
+    abstract member AcceptingWrite : unit IDeferred
     abstract member Write : value : 'a -> unit IDeferred
     abstract member WriteBatch : values : 'a array -> unit IDeferred
     abstract member WriteImmediately : value : 'a -> unit
@@ -43,7 +43,7 @@ module Pipe =
   val inline setCapacity : 'a IPipe -> capacity : int -> unit
   // IWriter functions
   val inline close : 'a IWriter -> unit
-  val inline writeAccepted : 'a IWriter -> unit IDeferred
+  val inline acceptingWrite : 'a IWriter -> unit IDeferred
   val inline write : 'a IWriter -> value : 'a -> unit IDeferred
   val inline writeBatch : 'a IWriter -> values : 'a array -> unit IDeferred
   val inline writeImmediately : 'a IWriter -> value : 'a -> unit
