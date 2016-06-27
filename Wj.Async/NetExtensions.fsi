@@ -10,6 +10,11 @@ module NetExtensions =
   type DPCEA = DownloadProgressChangedEventArgs
   type UPCEA = UploadProgressChangedEventArgs
 
+  type Dns with
+    static member GetHostAddresses : hostNameOrAddress : string -> IPAddress array IDeferred
+    static member GetHostEntry : hostNameOrAddress : string -> IPHostEntry IDeferred
+    static member GetHostEntry : address : IPAddress -> IPHostEntry IDeferred
+
   type WebClient with
     member DownloadDataDeferred : address : Uri -> byte array IDeferred
     member DownloadDataDeferredWithProgress : address : Uri -> byte array IDeferred * DPCEA DeferredSeq.T

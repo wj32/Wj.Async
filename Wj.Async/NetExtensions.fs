@@ -54,6 +54,22 @@ module NetExtensions =
       ) (fun () -> progressEvent.RemoveHandler(handler)) event createHandler start createResult
     (d, progress)
 
+  type Dns with
+    static member GetHostAddresses(hostNameOrAddress) =
+      Deferred.ofBeginEnd
+        (fun callback -> Dns.BeginGetHostAddresses(hostNameOrAddress, callback, null) |> ignore)
+        Dns.EndGetHostAddresses
+
+    static member GetHostEntry(hostNameOrAddress : string) =
+      Deferred.ofBeginEnd
+        (fun callback -> Dns.BeginGetHostEntry(hostNameOrAddress, callback, null) |> ignore)
+        Dns.EndGetHostEntry
+
+    static member GetHostEntry(address : IPAddress) =
+      Deferred.ofBeginEnd
+        (fun callback -> Dns.BeginGetHostEntry(address, callback, null) |> ignore)
+        Dns.EndGetHostEntry
+
   type WebClient with
     member inline t.DownloadAsyncWithProgress event createHandler start createResult =
       webClientAsyncWithProgress t.DownloadProgressChanged
@@ -192,23 +208,11 @@ module NetExtensions =
 
   type WebRequest with
     member t.GetRequestStreamDeferred() =
-      let supervisor = Supervisor.current ()
-      Deferred.create (fun v ->
-        t.BeginGetRequestStream((fun result ->
-          try
-            t.EndGetRequestStream(result) --> v
-          with ex ->
-            supervisor.SendException(ex)
-        ), null) |> ignore
-      )
+      Deferred.ofBeginEnd
+        (fun callback -> t.BeginGetRequestStream(callback, null) |> ignore)
+        t.EndGetRequestStream
 
     member t.GetResponseDeferred() =
-      let supervisor = Supervisor.current ()
-      Deferred.create (fun v ->
-        t.BeginGetResponse((fun result ->
-          try
-            t.EndGetResponse(result) --> v
-          with ex ->
-            supervisor.SendException(ex)
-        ), null) |> ignore
-      )
+      Deferred.ofBeginEnd
+        (fun callback -> t.BeginGetResponse(callback, null) |> ignore)
+        t.EndGetResponse
