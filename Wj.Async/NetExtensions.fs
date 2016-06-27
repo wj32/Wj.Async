@@ -43,18 +43,27 @@ module NetExtensions =
   let inline webClientAsyncWithProgress
     (progressEvent : IEvent<_, _>) createProgressHandler event createHandler start createResult
     =
-    let writer = DeferredSeq.Writer.create ()
-    let progress = DeferredSeq.Writer.read writer
+    let (writer, reader) = Pipe.create ()
     let mutable handler = null
+    let closeWriterAndRemoveHandler () =
+      match handler with
+      | null -> ()
+      | _ ->
+        Pipe.close writer
+        progressEvent.RemoveHandler(handler)
+        handler <- null
     let d =
       webClientAsyncInner (fun token ->
         let f _ (args : #ProgressChangedEventArgs) =
           if obj.ReferenceEquals(args.UserState, token) then
-            DeferredSeq.Writer.write writer args
+            if Pipe.isClosed writer then
+              closeWriterAndRemoveHandler ()
+            else
+              Pipe.writeImmediately writer args
         handler <- createProgressHandler f
         progressEvent.AddHandler(handler)
-      ) (fun () -> progressEvent.RemoveHandler(handler)) event createHandler start createResult
-    (d, progress)
+      ) closeWriterAndRemoveHandler event createHandler start createResult
+    (d, reader)
 
   type Dns with
     static member GetHostAddresses(hostNameOrAddress) =
