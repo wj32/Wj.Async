@@ -19,9 +19,9 @@
 #load "DeferredBuilder.fs"
 #load "DeferredSeqBuilder.fs"
 #load "Pipe.fs"
+#load "Operators.fs"
 #load "IOExtensions.fs"
 #load "NetExtensions.fs"
-#load "Operators.fs"
 
 open Wj.Async
 open Wj.Async.Deferred.Infix

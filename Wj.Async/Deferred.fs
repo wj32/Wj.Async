@@ -1,6 +1,7 @@
 ﻿namespace Wj.Async
 
 open System
+open System.Threading
 open System.Threading.Tasks
 
 module Deferred =
@@ -189,6 +190,18 @@ module Deferred =
   let unit = value ()
 
   let never () = Never.never () :> _ IDeferred
+
+  let start f =
+    let supervisor = ThreadShared.currentSupervisor ()
+    create (fun v ->
+      ThreadPool.QueueUserWorkItem(fun _ ->
+        try
+          let x = f ()
+          supervisor.Dispatcher.Enqueue((supervisor, fun () -> set v x))
+        with ex ->
+          supervisor.Dispatcher.Enqueue((supervisor, fun () -> supervisor.SendException(ex)))
+      ) |> ignore
+    )
 
   let ``return`` x = value x
 

@@ -5,7 +5,7 @@ open System.Collections.Generic
 
 module DeferredBuilder =
   type 'a T = 'a IDeferred
-  type 'a M = 'a IDeferred
+  type 'a M = 'a T
 
   type B() =
     member inline this.Bind(t, f) = Deferred.bind t f

@@ -75,11 +75,11 @@
     <Compile Include="DeferredSeqBuilder.fs" />
     <Compile Include="Pipe.fsi" />
     <Compile Include="Pipe.fs" />
+    <Compile Include="Operators.fs" />
     <Compile Include="IOExtensions.fsi" />
     <Compile Include="IOExtensions.fs" />
     <Compile Include="NetExtensions.fsi" />
     <Compile Include="NetExtensions.fs" />
-    <Compile Include="Operators.fs" />
     <None Include="Script.fsx" />
   </ItemGroup>
   <PropertyGroup>

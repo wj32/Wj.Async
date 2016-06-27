@@ -24,6 +24,8 @@ module Deferred =
   val unit : unit IDeferred
   val never : unit -> 'a IDeferred
 
+  val start : f : (unit -> 'a) -> 'a IDeferred
+
   // Monad
 
   val ``return`` : 'a -> 'a IDeferred // Same as value
