@@ -121,90 +121,68 @@ module NetExtensions =
         (fun token -> t.OpenReadAsync(address, token))
         (fun args -> args.Result)
 
-    member t.OpenWriteDeferred(address, requestMethod) =
+    member t.OpenWriteDeferred(address, ?requestMethod) =
       webClientAsync
         t.OpenWriteCompleted
         (fun f -> new OpenWriteCompletedEventHandler(f))
-        (fun token -> t.OpenWriteAsync(address, requestMethod, token))
+        (fun token -> t.OpenWriteAsync(address, defaultArg requestMethod null, token))
         (fun args -> args.Result)
-
-    member t.OpenWriteDeferred(address : Uri) = t.OpenWriteDeferred(address, null)
 
     member inline t.UploadAsyncWithProgress event createHandler start createResult =
       webClientAsyncWithProgress t.UploadProgressChanged
         (fun f -> new UploadProgressChangedEventHandler(f)) event createHandler start createResult
 
-    member inline t.UploadDataArgs address requestMethod data f =
+    member inline t.UploadDataArgs address data requestMethod f =
       f
         t.UploadDataCompleted
         (fun f -> new UploadDataCompletedEventHandler(f))
-        (fun token -> t.UploadDataAsync(address, requestMethod, data))
+        (fun token -> t.UploadDataAsync(address, defaultArg requestMethod null, data))
         (fun (args : UploadDataCompletedEventArgs) -> args.Result)
 
-    member t.UploadDataDeferred(address, requestMethod, data) =
-      webClientAsync |> t.UploadDataArgs address requestMethod data
+    member t.UploadDataDeferred(address, data, ?requestMethod) =
+      webClientAsync |> t.UploadDataArgs address data requestMethod
 
-    member t.UploadDataDeferred(address, data) = t.UploadDataDeferred(address, null, data)
+    member t.UploadDataDeferredWithProgress(address, data, ?requestMethod) =
+      t.UploadAsyncWithProgress |> t.UploadDataArgs address data requestMethod
 
-    member t.UploadDataDeferredWithProgress(address, requestMethod, data) =
-      t.UploadAsyncWithProgress |> t.UploadDataArgs address requestMethod data
-
-    member t.UploadDataDeferredWithProgress(address, data) =
-      t.UploadDataDeferredWithProgress(address, null, data)
-
-    member inline t.UploadFileArgs address requestMethod fileName f =
+    member inline t.UploadFileArgs address fileName requestMethod f =
       f
         t.UploadFileCompleted
         (fun f -> new UploadFileCompletedEventHandler(f))
-        (fun token -> t.UploadFileAsync(address, requestMethod, fileName))
+        (fun token -> t.UploadFileAsync(address, defaultArg requestMethod null, fileName))
         (fun (args : UploadFileCompletedEventArgs) -> args.Result)
 
-    member t.UploadFileDeferred(address, requestMethod, fileName) =
-      webClientAsync |> t.UploadFileArgs address requestMethod fileName
+    member t.UploadFileDeferred(address, fileName, ?requestMethod) =
+      webClientAsync |> t.UploadFileArgs address fileName requestMethod
 
-    member t.UploadFileDeferred(address, fileName) = t.UploadFileDeferred(address, null, fileName)
+    member t.UploadFileDeferredWithProgress(address, fileName, ?requestMethod) =
+      t.UploadAsyncWithProgress |> t.UploadFileArgs address fileName requestMethod
 
-    member t.UploadFileDeferredWithProgress(address, requestMethod, fileName) =
-      t.UploadAsyncWithProgress |> t.UploadFileArgs address requestMethod fileName
-
-    member t.UploadFileDeferredWithProgress(address, fileName) =
-      t.UploadFileDeferredWithProgress(address, null, fileName)
-
-    member inline t.UploadStringArgs address requestMethod data f =
+    member inline t.UploadStringArgs address data requestMethod f =
       f
         t.UploadStringCompleted
         (fun f -> new UploadStringCompletedEventHandler(f))
-        (fun token -> t.UploadStringAsync(address, requestMethod, data))
+        (fun token -> t.UploadStringAsync(address, defaultArg requestMethod null, data))
         (fun (args : UploadStringCompletedEventArgs) -> args.Result)
 
-    member t.UploadStringDeferred(address, requestMethod, data) =
-      webClientAsync |> t.UploadStringArgs address requestMethod data
+    member t.UploadStringDeferred(address, data, ?requestMethod) =
+      webClientAsync |> t.UploadStringArgs address data requestMethod
 
-    member t.UploadStringDeferred(address, data) = t.UploadStringDeferred(address, null, data)
+    member t.UploadStringDeferredWithProgress(address, data, ?requestMethod) =
+      t.UploadAsyncWithProgress |> t.UploadStringArgs address data requestMethod
 
-    member t.UploadStringDeferredWithProgress(address, requestMethod, data) =
-      t.UploadAsyncWithProgress |> t.UploadStringArgs address requestMethod data
-
-    member t.UploadStringDeferredWithProgress(address, data) =
-      t.UploadStringDeferredWithProgress(address, null, data)
-
-    member inline t.UploadValuesArgs address requestMethod data f =
+    member inline t.UploadValuesArgs address data requestMethod f =
       f
         t.UploadValuesCompleted
         (fun f -> new UploadValuesCompletedEventHandler(f))
-        (fun token -> t.UploadValuesAsync(address, requestMethod, data))
+        (fun token -> t.UploadValuesAsync(address, defaultArg requestMethod null, data))
         (fun (args : UploadValuesCompletedEventArgs) -> args.Result)
 
-    member t.UploadValuesDeferred(address, requestMethod, data) =
-      webClientAsync |> t.UploadValuesArgs address requestMethod data
+    member t.UploadValuesDeferred(address, data, ?requestMethod) =
+      webClientAsync |> t.UploadValuesArgs address data requestMethod
 
-    member t.UploadValuesDeferred(address, data) = t.UploadValuesDeferred(address, null, data)
-
-    member t.UploadValuesDeferredWithProgress(address, requestMethod, data) =
-      t.UploadAsyncWithProgress |> t.UploadValuesArgs address requestMethod data
-
-    member t.UploadValuesDeferredWithProgress(address, data) =
-      t.UploadValuesDeferredWithProgress(address, null, data)
+    member t.UploadValuesDeferredWithProgress(address, data, ?requestMethod) =
+      t.UploadAsyncWithProgress |> t.UploadValuesArgs address data requestMethod
 
   type WebRequest with
     member t.GetRequestStreamDeferred() =
