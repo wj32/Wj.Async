@@ -101,18 +101,22 @@ module Deferred =
         member t.Upon(f) = (t :> _ IDeferred).Upon((ThreadShared.currentSupervisor (), f))
 
         member t.Upon((supervisor, f) as supervisedCallback) =
-          match t.state with
-          | Pending callbacks -> RegistrationList.add callbacks supervisedCallback
-          | Value x -> enqueue supervisor f x
-          | Linked parent -> upon' (T<'a>.FindRoot(parent)) supervisedCallback
+          lock t (fun () ->
+            match t.state with
+            | Pending callbacks -> RegistrationList.add callbacks supervisedCallback
+            | Value x -> enqueue supervisor f x
+            | Linked parent -> upon' (T<'a>.FindRoot(parent)) supervisedCallback
+          )
 
         member t.Register(f) = (t :> _ IDeferred).Register((ThreadShared.currentSupervisor (), f))
 
         member t.Register((supervisor, f) as supervisedCallback) =
-          match t.state with
-          | Pending callbacks -> RegistrationList.register callbacks supervisedCallback
-          | Value x -> enqueue supervisor f x; Registration.empty
-          | Linked parent -> register' (T<'a>.FindRoot(parent)) supervisedCallback
+          lock t (fun () ->
+            match t.state with
+            | Pending callbacks -> RegistrationList.register callbacks supervisedCallback
+            | Value x -> enqueue supervisor f x; Registration.empty
+            | Linked parent -> register' (T<'a>.FindRoot(parent)) supervisedCallback
+          )
 
         member t.MoveFrom(from) =
           match t.state with
@@ -146,13 +150,15 @@ module Deferred =
             invalidOp VarAlreadySetOrLinked
 
         member t.TrySet(x) =
-          match t.state with
-          | Pending callbacks ->
-            t.state <- Value x
-            RegistrationList.toList callbacks
-            |> List.iter (fun (supervisor, f) -> enqueue supervisor f x)
-            true
-          | _ -> false
+          lock t (fun () ->
+            match t.state with
+            | Pending callbacks ->
+              t.state <- Value x
+              RegistrationList.toList callbacks
+              |> List.iter (fun (supervisor, f) -> enqueue supervisor f x)
+              true
+            | _ -> false
+          )
 
         member t.Link(parent) =
           if not ((t :> _ IVar).TryLink(parent)) then

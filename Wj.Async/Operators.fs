@@ -1,5 +1,6 @@
 ﻿namespace Wj.Async
 
+[<AutoOpen>]
 module Operators =
   let after = Clock.after
   let afterMs = Clock.afterMs

@@ -19,11 +19,12 @@
 #load "DeferredBuilder.fs"
 #load "DeferredSeqBuilder.fs"
 #load "Pipe.fs"
+#load "IOExtensions.fs"
+#load "NetExtensions.fs"
 #load "Operators.fs"
 
 open Wj.Async
 open Wj.Async.Deferred.Infix
-open Wj.Async.Operators
 open System.Threading.Tasks
 
 let dispatcher = Dispatcher.create ()
