@@ -376,3 +376,14 @@ let testPipe () =
     }
     do! Deferred.allUnit [printer 1; printer 2]
   })
+
+let testOfAsync () =
+  let a = async {
+    raise (invalidOp "Test exception")
+  }
+  Dispatcher.run dispatcher (fun () -> deferred {
+    try
+      do! Deferred.ofAsyncStart a
+    with ex ->
+      printfn "Caught exception: %A" ex
+  })

@@ -21,14 +21,16 @@ module NetExtensions =
       let mutable handler = null
       let f _ (args : #AsyncCompletedEventArgs) =
         if obj.ReferenceEquals(args.UserState, token) then
-          completed ()
-          event.RemoveHandler(handler)
-          if args.Cancelled then
-            supervisor.SendException(new OperationCanceledException())
-          else if args.Error <> null then
-            supervisor.SendException(args.Error)
-          else
-            createResult args --> v
+          supervisor.Dispatcher.Enqueue((supervisor, fun () ->
+            completed ()
+            event.RemoveHandler(handler)
+            if args.Cancelled then
+              supervisor.SendException(new OperationCanceledException())
+            else if args.Error <> null then
+              supervisor.SendException(args.Error)
+            else
+              createResult args --> v
+          ))
       handler <- createHandler f
       event.AddHandler(handler)
       beforeStart token

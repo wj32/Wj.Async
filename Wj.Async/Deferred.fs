@@ -101,22 +101,18 @@ module Deferred =
         member t.Upon(f) = (t :> _ IDeferred).Upon((ThreadShared.currentSupervisor (), f))
 
         member t.Upon((supervisor, f) as supervisedCallback) =
-          lock t (fun () ->
-            match t.state with
-            | Pending callbacks -> RegistrationList.add callbacks supervisedCallback
-            | Value x -> enqueue supervisor f x
-            | Linked parent -> upon' (T<'a>.FindRoot(parent)) supervisedCallback
-          )
+          match t.state with
+          | Pending callbacks -> RegistrationList.add callbacks supervisedCallback
+          | Value x -> enqueue supervisor f x
+          | Linked parent -> upon' (T<'a>.FindRoot(parent)) supervisedCallback
 
         member t.Register(f) = (t :> _ IDeferred).Register((ThreadShared.currentSupervisor (), f))
 
         member t.Register((supervisor, f) as supervisedCallback) =
-          lock t (fun () ->
-            match t.state with
-            | Pending callbacks -> RegistrationList.register callbacks supervisedCallback
-            | Value x -> enqueue supervisor f x; Registration.empty
-            | Linked parent -> register' (T<'a>.FindRoot(parent)) supervisedCallback
-          )
+          match t.state with
+          | Pending callbacks -> RegistrationList.register callbacks supervisedCallback
+          | Value x -> enqueue supervisor f x; Registration.empty
+          | Linked parent -> register' (T<'a>.FindRoot(parent)) supervisedCallback
 
         member t.MoveFrom(from) =
           match t.state with
@@ -150,15 +146,13 @@ module Deferred =
             invalidOp VarAlreadySetOrLinked
 
         member t.TrySet(x) =
-          lock t (fun () ->
-            match t.state with
-            | Pending callbacks ->
-              t.state <- Value x
-              RegistrationList.toList callbacks
-              |> List.iter (fun (supervisor, f) -> enqueue supervisor f x)
-              true
-            | _ -> false
-          )
+          match t.state with
+          | Pending callbacks ->
+            t.state <- Value x
+            RegistrationList.toList callbacks
+            |> List.iter (fun (supervisor, f) -> enqueue supervisor f x)
+            true
+          | _ -> false
 
         member t.Link(parent) =
           if not ((t :> _ IVar).TryLink(parent)) then
@@ -287,22 +281,23 @@ module Deferred =
       upon (finalizer ()) (fun () -> raise ex)
       never ()
 
-  let ofAsync a =
-    let v = createVar ()
-    let a = async {
-      let! x = a
-      set v x
-    }
-    (a, v :> _ IDeferred)
+  let ofAsyncStart a =
+    let supervisor = ThreadShared.currentSupervisor ()
+    create (fun v ->
+      Async.Start(async {
+        try
+          let! x = a
+          supervisor.Dispatcher.Enqueue((supervisor, fun () -> set v x))
+        with ex ->
+          supervisor.Dispatcher.Enqueue((supervisor, fun () -> supervisor.SendException(ex)))
+      })
+    )
 
   let inline internal ofBeginEnd (``begin`` : AsyncCallback -> unit) ``end`` =
     let supervisor = ThreadShared.currentSupervisor ()
     create (fun v ->
       ``begin`` (new AsyncCallback(fun result ->
-        try
-          set v (``end`` result)
-        with ex ->
-          supervisor.SendException(ex)
+        supervisor.Dispatcher.Enqueue((supervisor, fun () -> set v (``end`` result)))
       ))
     )
 

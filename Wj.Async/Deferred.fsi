@@ -58,7 +58,7 @@ module Deferred =
 
   // Conversion
 
-  val ofAsync : 'a Async -> unit Async * 'a IDeferred
+  val ofAsyncStart : 'a Async -> 'a IDeferred
   val inline internal ofBeginEnd
     : ``begin`` : (System.AsyncCallback -> unit)
     -> ``end`` : (System.IAsyncResult -> 'a)
