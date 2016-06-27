@@ -30,7 +30,7 @@ module Supervisor =
 
         member t.Name = "Root"
 
-        member t.SendException(ex) = raise ex
+        member t.SendException(ex) = raise (SupervisorRootException ex)
 
         member t.Detach() = ()
 
@@ -66,9 +66,9 @@ module Supervisor =
   module AfterDetermined =
     type T = Raise | Log | Ignore
 
-  let handleAfterDetermined afterDetermined ex =
+  let handleAfterDetermined afterDetermined supervisorName ex =
     match afterDetermined with
-    | AfterDetermined.Raise -> raise ex
+    | AfterDetermined.Raise -> raise (AfterDeterminedException (supervisorName, ex))
     | AfterDetermined.Log -> stderr.WriteLine(sprintf "Unhandled exception after tryWith:\n%s" (string ex))
     | AfterDetermined.Ignore -> ()
 
@@ -76,7 +76,7 @@ module Supervisor =
     let t = createNamed "tryWith"
     detach t
     let startHandlingAfterDetermined () =
-      uponException t (fun ex -> handleAfterDetermined afterDetermined ex)
+      uponException t (fun ex -> handleAfterDetermined afterDetermined t.Name ex)
     let result = tryRun t f
     match result with
     | Result.Success d ->
@@ -92,7 +92,7 @@ module Supervisor =
           | Some v ->
             writer <- None
             Deferred.link v (handler ex)
-          | None -> handleAfterDetermined afterDetermined ex
+          | None -> handleAfterDetermined afterDetermined t.Name ex
         )
         Deferred.upon' d (dispatcher.RootSupervisor, (fun x ->
           match writer with

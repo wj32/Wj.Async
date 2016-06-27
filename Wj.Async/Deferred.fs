@@ -254,21 +254,23 @@ module Deferred =
 
   // We define tryFinally in this module because we need it for sequence processing later on.
   let tryFinally (f : unit -> _ IDeferred) (finalizer : unit -> _ IDeferred) =
+    let supervisor = ThreadShared.currentSupervisor ()
     let t = ChildSupervisor.create "tryFinally"
     t.Detach()
+    let raiseAfterDetermined ex = raise (AfterDeterminedException (t.Name, ex))
     let result = t.TryRun(f)
     match result with
     | Result.Success d ->
       if isDetermined d then
-        t.UponException(raise)
+        t.UponException(raiseAfterDetermined)
         map (finalizer ()) (fun () -> get d)
       else
         let reader = createVar ()
         let mutable writer = Some reader
         t.UponException(fun ex ->
           match writer with
-          | Some _ -> writer <- None; upon (finalizer ()) (fun () -> raise ex)
-          | None -> raise ex
+          | Some _ -> writer <- None; upon (finalizer ()) (fun () -> supervisor.SendException(ex))
+          | None -> raiseAfterDetermined ex
         )
         upon d (fun x ->
           match writer with
@@ -277,8 +279,8 @@ module Deferred =
         )
         reader :> _ IDeferred
     | Result.Failure ex ->
-      t.UponException(raise)
-      upon (finalizer ()) (fun () -> raise ex)
+      t.UponException(raiseAfterDetermined)
+      upon (finalizer ()) (fun () -> supervisor.SendException(ex))
       never ()
 
   let ofAsyncStart a =

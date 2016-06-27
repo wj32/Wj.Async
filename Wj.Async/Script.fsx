@@ -379,7 +379,7 @@ let testPipe () =
 
 let testOfAsync () =
   let a = async {
-    raise (invalidOp "Test exception")
+    invalidOp "Test exception"
   }
   Dispatcher.run dispatcher (fun () -> deferred {
     try
