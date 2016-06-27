@@ -50,7 +50,7 @@ module Deferred =
   val anyi : 'a IDeferred list -> (int * 'a) IDeferred
   val any : 'a IDeferred list -> 'a IDeferred
   val anyUnit : 'a IDeferred list -> unit IDeferred
-  val dontWaitFor : unit IDeferred -> unit
+  val inline dontWaitFor : unit IDeferred -> unit
 
   // Try-finally
 
@@ -59,6 +59,10 @@ module Deferred =
   // Conversion
 
   val ofAsync : 'a Async -> unit Async * 'a IDeferred
+  val inline internal ofBeginEnd
+    : ``begin`` : (System.AsyncCallback -> unit)
+    -> ``end`` : (System.IAsyncResult -> 'a)
+    -> 'a IDeferred
   val ofTask : 'a System.Threading.Tasks.Task -> 'a IDeferred
   val ofTaskUnit : System.Threading.Tasks.Task -> unit IDeferred
 

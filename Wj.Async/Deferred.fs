@@ -256,7 +256,7 @@ module Deferred =
 
   let anyUnit (ts : _ IDeferred list) = mapAnyi ts (fun i x -> ())
 
-  let dontWaitFor (t : unit IDeferred) = ()
+  let inline dontWaitFor (t : unit IDeferred) = ()
 
   // We define tryFinally in this module because we need it for sequence processing later on.
   let tryFinally (f : unit -> _ IDeferred) (finalizer : unit -> _ IDeferred) =
@@ -294,6 +294,17 @@ module Deferred =
       set v x
     }
     (a, v :> _ IDeferred)
+
+  let inline internal ofBeginEnd (``begin`` : AsyncCallback -> unit) ``end`` =
+    let supervisor = ThreadShared.currentSupervisor ()
+    create (fun v ->
+      ``begin`` (new AsyncCallback(fun result ->
+        try
+          set v (``end`` result)
+        with ex ->
+          supervisor.SendException(ex)
+      ))
+    )
 
   let ofTask (task : 'a Task) =
     create (fun v -> task.ContinueWith(Action<Task<'a>>(fun _ -> v.Set(task.Result))) |> ignore)
