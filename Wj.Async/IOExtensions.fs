@@ -204,7 +204,11 @@ module IOExtensions =
           reader.ReadLineDeferred()
           >>= function
           | null -> Deferred.unit
-          | line -> Pipe.write writer line >>= loop
+          | line ->
+            if Pipe.isClosed writer then
+              Deferred.unit
+            else
+              Pipe.write writer line >>= loop
         do! loop ()
       })
 
