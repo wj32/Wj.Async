@@ -12,6 +12,7 @@ module IOExtensions =
     member ReadDeferred : buffer : byte array * ?offset : int * ?count : int -> int IDeferred
     member ReadDeferred : count : int -> byte array IDeferred
     member WriteDeferred : buffer : byte array * ?offset : int * ?count : int -> unit IDeferred
+    member CopyToDeferred : destination : Stream * ?bufferSize : int -> unit IDeferred
 
   type TextReader with
     member ReadDeferred : buffer : char array * ?index : int * ?count : int -> int IDeferred

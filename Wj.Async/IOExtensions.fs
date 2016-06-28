@@ -50,6 +50,19 @@ module IOExtensions =
         (fun callback -> t.BeginWrite(buffer, offset, count, callback, null) |> ignore)
         t.EndWrite
 
+    member t.CopyToDeferred(destination : Stream, ?bufferSize) =
+      let bufferSize = defaultArg bufferSize (20 * 4096)
+      let buffer = Array.zeroCreate bufferSize
+      let rec loop () =
+        t.ReadDeferred(buffer)
+        >>= fun readBytes ->
+        if readBytes <> 0 then
+          destination.WriteDeferred(buffer, count = readBytes)
+          >>= loop
+        else
+          Deferred.unit
+      loop ()
+
   type TextReader with
     member t.ReadDeferred(buffer, ?index, ?count) =
       let index = defaultArg index 0
