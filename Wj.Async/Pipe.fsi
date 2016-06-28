@@ -89,6 +89,7 @@ module Pipe =
   val append : reader1 : 'a IReader -> reader2 : 'a IReader -> 'a IReader
   val interleave : readers : 'a IReader list -> 'a IReader
   val interleavePipe : readers : 'a IReader IReader -> 'a IReader
+  val choice : reader : 'a IReader -> 'a option Deferred.IChoice
 
   val ofArray : 'a array -> 'a IReader
   val toArray : 'a IReader -> 'a array IDeferred

@@ -355,6 +355,8 @@ module Pipe =
 
   let interleavePipe (tt : _ IReader IReader) = interleaveGeneric Deferred.upon iterInline tt
 
+  let choice t = Deferred.choice (available t) (function Some () -> readImmediately t | None -> None)
+
   let ofArray xs = createReader (fun writer -> writeBatch writer xs)
 
   let toArray t = readAllSystemList id t >>| fun list -> list.ToArray()
