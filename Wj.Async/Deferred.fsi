@@ -63,7 +63,7 @@ module Deferred =
 
   val ofAsyncStart : 'a Async -> 'a IDeferred
   val inline internal ofBeginEnd
-    : ``begin`` : (System.AsyncCallback -> unit)
+    : ``begin`` : (System.AsyncCallback -> 'unused)
     -> ``end`` : (System.IAsyncResult -> 'a)
     -> 'a IDeferred
   val ofTask : 'a System.Threading.Tasks.Task -> 'a IDeferred

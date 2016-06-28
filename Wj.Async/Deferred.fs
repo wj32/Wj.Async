@@ -321,12 +321,12 @@ module Deferred =
       })
     )
 
-  let inline internal ofBeginEnd (``begin`` : AsyncCallback -> unit) ``end`` =
+  let inline internal ofBeginEnd (``begin`` : AsyncCallback -> _) ``end`` =
     let supervisor = ThreadShared.currentSupervisor ()
     create (fun v ->
       ``begin`` (new AsyncCallback(fun result ->
         supervisor.Dispatcher.Enqueue((supervisor, fun () -> set v (``end`` result)))
-      ))
+      )) |> ignore
     )
 
   let ofTask (task : 'a Task) =

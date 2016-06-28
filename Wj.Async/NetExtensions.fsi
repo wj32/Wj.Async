@@ -4,6 +4,9 @@ open System
 open System.Collections.Specialized
 open System.IO
 open System.Net
+open System.Net.WebSockets
+open System.Security.Cryptography.X509Certificates
+open System.Threading
 
 [<AutoOpen>]
 module NetExtensions =
@@ -14,6 +17,15 @@ module NetExtensions =
     static member GetHostAddresses : hostNameOrAddress : string -> IPAddress array IDeferred
     static member GetHostEntry : hostNameOrAddress : string -> IPHostEntry IDeferred
     static member GetHostEntry : address : IPAddress -> IPHostEntry IDeferred
+
+  type HttpListener with
+    member GetContextDeferred : unit -> HttpListenerContext IDeferred
+
+  type HttpListenerContext with
+    member AcceptWebSocketDeferred : subProtocol : string * ?keepAliveInterval : TimeSpan * ?receiveBufferSize : int * ?internalBuffer : byte ArraySegment -> HttpListenerWebSocketContext IDeferred
+
+  type HttpListenerRequest with
+    member GetClientCertificateDeferred : unit -> X509Certificate2 IDeferred
 
   type WebClient with
     member DownloadDataDeferred : address : Uri -> byte array IDeferred
@@ -36,3 +48,9 @@ module NetExtensions =
   type WebRequest with
     member GetRequestStreamDeferred : unit -> Stream IDeferred
     member GetResponseDeferred : unit -> WebResponse IDeferred
+
+  type WebSocket with
+    member CloseDeferred : closeStatus : WebSocketCloseStatus * statusDescription : string * ?cancellationToken : CancellationToken -> unit IDeferred
+    member CloseOutputDeferred : closeStatus : WebSocketCloseStatus * statusDescription : string * ?cancellationToken : CancellationToken -> unit IDeferred
+    member ReceiveDeferred : buffer : byte ArraySegment * ?cancellationToken : CancellationToken -> WebSocketReceiveResult IDeferred
+    member SendDeferred : buffer : byte ArraySegment * messageType : WebSocketMessageType * endOfMessage : bool * ?cancellationToken : CancellationToken -> unit IDeferred

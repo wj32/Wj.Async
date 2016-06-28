@@ -31,7 +31,7 @@ module IOExtensions =
       let offset = defaultArg offset 0
       let count = defaultArg count (Array.length buffer)
       Deferred.ofBeginEnd
-        (fun callback -> t.BeginRead(buffer, offset, count, callback, null) |> ignore)
+        (fun callback -> t.BeginRead(buffer, offset, count, callback, null))
         t.EndRead
 
     member t.ReadDeferred(count) =
@@ -47,7 +47,7 @@ module IOExtensions =
       let offset = defaultArg offset 0
       let count = defaultArg count (Array.length buffer)
       Deferred.ofBeginEnd
-        (fun callback -> t.BeginWrite(buffer, offset, count, callback, null) |> ignore)
+        (fun callback -> t.BeginWrite(buffer, offset, count, callback, null))
         t.EndWrite
 
     member t.CopyToDeferred(destination : Stream, ?bufferSize) =

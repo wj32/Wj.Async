@@ -4,6 +4,9 @@ open System
 open System.ComponentModel
 open System.IO
 open System.Net
+open System.Net.WebSockets
+open System.Security.Cryptography.X509Certificates
+open System.Threading
 
 [<AutoOpen>]
 module NetExtensions =
@@ -68,18 +71,44 @@ module NetExtensions =
   type Dns with
     static member GetHostAddresses(hostNameOrAddress) =
       Deferred.ofBeginEnd
-        (fun callback -> Dns.BeginGetHostAddresses(hostNameOrAddress, callback, null) |> ignore)
+        (fun callback -> Dns.BeginGetHostAddresses(hostNameOrAddress, callback, null))
         Dns.EndGetHostAddresses
 
     static member GetHostEntry(hostNameOrAddress : string) =
       Deferred.ofBeginEnd
-        (fun callback -> Dns.BeginGetHostEntry(hostNameOrAddress, callback, null) |> ignore)
+        (fun callback -> Dns.BeginGetHostEntry(hostNameOrAddress, callback, null))
         Dns.EndGetHostEntry
 
     static member GetHostEntry(address : IPAddress) =
       Deferred.ofBeginEnd
-        (fun callback -> Dns.BeginGetHostEntry(address, callback, null) |> ignore)
+        (fun callback -> Dns.BeginGetHostEntry(address, callback, null))
         Dns.EndGetHostEntry
+
+  type HttpListener with
+    member t.GetContextDeferred() =
+      Deferred.ofBeginEnd
+        (fun callback -> t.BeginGetContext(callback, null))
+        t.EndGetContext
+
+  type HttpListenerContext with
+    member t.AcceptWebSocketDeferred
+      (subProtocol, ?keepAliveInterval, ?receiveBufferSize, ?internalBuffer)
+      =
+      let keepAliveInterval = defaultArg keepAliveInterval WebSocket.DefaultKeepAliveInterval
+      let receiveBufferSize = defaultArg receiveBufferSize 16384
+      match internalBuffer with
+      | Some internalBuffer ->
+        Deferred.ofTask (
+          t.AcceptWebSocketAsync(subProtocol, receiveBufferSize, keepAliveInterval, internalBuffer)
+        )
+      | None ->
+        Deferred.ofTask (t.AcceptWebSocketAsync(subProtocol, receiveBufferSize, keepAliveInterval))
+
+  type HttpListenerRequest with
+    member t.GetClientCertificateDeferred() =
+      Deferred.ofBeginEnd
+        (fun callback -> t.BeginGetClientCertificate(callback, null))
+        t.EndGetClientCertificate
 
   type WebClient with
     member inline t.DownloadAsyncWithProgress event createHandler start createResult =
@@ -198,10 +227,27 @@ module NetExtensions =
   type WebRequest with
     member t.GetRequestStreamDeferred() =
       Deferred.ofBeginEnd
-        (fun callback -> t.BeginGetRequestStream(callback, null) |> ignore)
+        (fun callback -> t.BeginGetRequestStream(callback, null))
         t.EndGetRequestStream
 
     member t.GetResponseDeferred() =
       Deferred.ofBeginEnd
-        (fun callback -> t.BeginGetResponse(callback, null) |> ignore)
+        (fun callback -> t.BeginGetResponse(callback, null))
         t.EndGetResponse
+
+  type WebSocket with
+    member t.CloseDeferred(closeStatus, statusDescription, ?cancellationToken) =
+      let cancellationToken = defaultArg cancellationToken CancellationToken.None
+      Deferred.ofTaskUnit (t.CloseAsync(closeStatus, statusDescription, cancellationToken))
+
+    member t.CloseOutputDeferred(closeStatus, statusDescription, ?cancellationToken) =
+      let cancellationToken = defaultArg cancellationToken CancellationToken.None
+      Deferred.ofTaskUnit (t.CloseOutputAsync(closeStatus, statusDescription, cancellationToken))
+
+    member t.ReceiveDeferred(buffer, ?cancellationToken) =
+      let cancellationToken = defaultArg cancellationToken CancellationToken.None
+      Deferred.ofTask (t.ReceiveAsync(buffer, cancellationToken))
+
+    member t.SendDeferred(buffer, messageType, endOfMessage, ?cancellationToken) =
+      let cancellationToken = defaultArg cancellationToken CancellationToken.None
+      Deferred.ofTaskUnit (t.SendAsync(buffer, messageType, endOfMessage, cancellationToken))
