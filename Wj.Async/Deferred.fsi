@@ -25,6 +25,7 @@ module Deferred =
   val never : unit -> 'a IDeferred
 
   val start : f : (unit -> 'a) -> 'a IDeferred
+  val startThread : threadType : ThreadType.T -> f : (unit -> 'a) -> 'a IDeferred
 
   // Monad
 

@@ -191,16 +191,29 @@ module Deferred =
 
   let never () = Never.never () :> _ IDeferred
 
-  let start f =
+  let inline createThreadStart v f =
     let supervisor = ThreadShared.currentSupervisor ()
+    (fun _ ->
+      try
+        let x = f ()
+        supervisor.Dispatcher.Enqueue((supervisor, fun () -> set v x))
+      with ex ->
+        supervisor.Dispatcher.Enqueue((supervisor, fun () -> supervisor.SendException(ex)))
+    )
+
+  let start f =
     create (fun v ->
-      ThreadPool.QueueUserWorkItem(fun _ ->
-        try
-          let x = f ()
-          supervisor.Dispatcher.Enqueue((supervisor, fun () -> set v x))
-        with ex ->
-          supervisor.Dispatcher.Enqueue((supervisor, fun () -> supervisor.SendException(ex)))
-      ) |> ignore
+      ThreadPool.QueueUserWorkItem(new WaitCallback(createThreadStart v f)) |> ignore
+    )
+
+  let startThread threadType f =
+    create (fun v ->
+      let thread = new Thread(new ParameterizedThreadStart(createThreadStart v f))
+      thread.IsBackground <-
+        match threadType with
+        | ThreadType.Foreground -> false
+        | ThreadType.Background -> true
+      thread.Start()
     )
 
   let ``return`` x = value x

@@ -56,6 +56,7 @@
     <Compile Include="CoreTypes.fs" />
     <Compile Include="IVar.fs" />
     <Compile Include="Parallelism.fs" />
+    <Compile Include="ThreadType.fs" />
     <Compile Include="ThreadShared.fsi" />
     <Compile Include="ThreadShared.fs" />
     <Compile Include="ChildSupervisor.fs" />
