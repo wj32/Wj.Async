@@ -11,6 +11,8 @@ and [<Interface>] ISupervisor =
   abstract member Parent : ISupervisor option
   abstract member Name : string
   abstract member Detach : unit -> unit
+  abstract member IsTerminated : bool
+  abstract member Terminate : unit -> unit
   abstract member SendException : ex : exn -> unit
   abstract member UponException : handler : (exn -> unit) -> unit
   abstract member UponException : supervisedHandler : exn SupervisedCallback -> unit

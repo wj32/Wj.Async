@@ -21,7 +21,7 @@
 #load "DeferredSeqBuilder.fs"
 #load "Pipe.fs"
 #load "Operators.fs"
-#load "CancellationSignal.fs"
+#load "Cancellation.fs"
 #load "IOExtensions.fs"
 #load "NetExtensions.fs"
 
@@ -388,4 +388,21 @@ let testOfAsync () =
       do! Deferred.ofAsyncStart a
     with ex ->
       printfn "Caught exception: %A" ex
+  })
+
+let testAfterException () =
+  Dispatcher.run dispatcher (fun () -> deferred {
+    try
+      dontWaitFor (deferred {
+        do! afterMs 500
+        printfn "This should appear"
+        do! afterMs 1000
+        printfn "This should not appear"
+        invalidOp "This should not appear either"
+      })
+      do! afterMs 1000
+      invalidOp "Test exception"
+    with ex ->
+      printfn "Caught exception: %A" ex
+    do! afterMs 2000
   })

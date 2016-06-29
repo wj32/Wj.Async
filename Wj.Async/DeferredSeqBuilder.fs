@@ -30,7 +30,8 @@ module DeferredSeqBuilder =
       Supervisor.tryFinally (fun () -> body writer) (fun () -> finalizer (); Deferred.unit)
 
     member inline this.TryWith(body : _ M, handler) = fun writer ->
-      Supervisor.tryWith (fun () -> body writer) (fun ex -> handler ex writer) Supervisor.AfterDetermined.Log
+      Supervisor.tryWith (fun () -> body writer) (fun ex -> handler ex writer)
+        Supervisor.AfterDetermined.Log Supervisor.AfterException.Terminate
 
     member inline this.Using(disposable : #IDisposable, body : _ -> _ M) = fun writer ->
       // TODO: If disposable is a struct, it will get boxed in the check below. Find a way of handling
