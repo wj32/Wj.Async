@@ -8,6 +8,7 @@
 #load "Queue.fs"
 #load "CoreTypes.fs"
 #load "Parallelism.fs"
+#load "ThreadType.fs"
 #load "IVar.fs"
 #load "ThreadShared.fs"
 #load "ChildSupervisor.fs"
@@ -20,6 +21,7 @@
 #load "DeferredSeqBuilder.fs"
 #load "Pipe.fs"
 #load "Operators.fs"
+#load "CancellationSignal.fs"
 #load "IOExtensions.fs"
 #load "NetExtensions.fs"
 
