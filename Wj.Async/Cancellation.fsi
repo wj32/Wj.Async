@@ -2,9 +2,15 @@
 
 open System.Threading
 
-module CancellationSignal =
+module Cancellation =
   type T = unit IDeferred
-  type Source = unit IVar
+
+  module Source =
+    type T = unit IVar
+
+    val inline create : unit -> T
+    val inline set : T -> unit
+
 
   val now : T
   val never : T
@@ -12,9 +18,6 @@ module CancellationSignal =
   val inline isSet : T -> bool
   val raiseIfSet : T -> unit
 
+  val inline ofSource : Source.T -> T
   val ofToken : CancellationToken -> T
   val toToken : T -> CancellationToken
-
-  val inline create : unit -> Source
-  val inline ofSource : Source -> T
-  val inline set : Source -> unit

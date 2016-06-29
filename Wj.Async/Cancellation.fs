@@ -3,13 +3,12 @@
 open System
 open System.Threading
 
-module CancellationSignal =
+module Cancellation =
   open Deferred.Infix
 
   let [<Literal>] CancellationNotRequested = "Cancellation has not yet been requested."
 
   type T = unit IDeferred
-  type Source = unit IVar
 
   module CancellationTokenWrapper =
     [<ReferenceEquality>]
@@ -122,6 +121,13 @@ module CancellationSignal =
 
     let inline create token : T = {state = Unregistered token}
 
+  module Source =
+    type T = unit IVar
+
+    let inline create () : T = Deferred.createVar ()
+
+    let inline set source = Deferred.trySet source () |> ignore
+
   let now = Deferred.unit
 
   let never : T = Deferred.never ()
@@ -130,15 +136,11 @@ module CancellationSignal =
 
   let raiseIfSet (t : T) = if isSet t then raise (new OperationCanceledException())
 
+  let inline ofSource (source : Source.T) = source :> T
+
   let ofToken token = CancellationTokenWrapper.create token :> T
 
   let toToken t =
     let source = new CancellationTokenSource()
     t >>> (source.Cancel : unit -> unit)
     source.Token
-
-  let inline create () : Source = Deferred.createVar ()
-
-  let inline ofSource (source : Source) = source :> T
-
-  let inline set source = Deferred.trySet source () |> ignore
