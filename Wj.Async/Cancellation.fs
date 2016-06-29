@@ -150,3 +150,17 @@ module Cancellation =
     let source = new CancellationTokenSource()
     t >>> (source.Cancel : unit -> unit)
     source.Token
+
+  module Option =
+    let inline isSet (t : T option) = match t with Some t -> isSet t | None -> false
+
+    let inline raiseIfSet (t : T option) = match t with Some t -> raiseIfSet t | None -> ()
+
+    let inline run (t : T option) f = match t with Some t -> run t f | None -> f ()
+
+    let inline ofSource source = Some (ofSource source)
+
+    let inline ofToken token = Some (ofToken token)
+
+    let inline toToken (t : T option) =
+      match t with Some t -> toToken t | None -> CancellationToken.None

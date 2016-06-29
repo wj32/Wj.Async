@@ -236,18 +236,18 @@ module NetExtensions =
         t.EndGetResponse
 
   type WebSocket with
-    member t.CloseDeferred(closeStatus, statusDescription, ?cancellationToken) =
-      let cancellationToken = defaultArg cancellationToken CancellationToken.None
+    member t.CloseDeferred(closeStatus, statusDescription, ?cancellation) =
+      let cancellationToken = Cancellation.Option.toToken cancellation
       Deferred.ofTaskUnit (t.CloseAsync(closeStatus, statusDescription, cancellationToken))
 
-    member t.CloseOutputDeferred(closeStatus, statusDescription, ?cancellationToken) =
-      let cancellationToken = defaultArg cancellationToken CancellationToken.None
+    member t.CloseOutputDeferred(closeStatus, statusDescription, ?cancellation) =
+      let cancellationToken = Cancellation.Option.toToken cancellation
       Deferred.ofTaskUnit (t.CloseOutputAsync(closeStatus, statusDescription, cancellationToken))
 
-    member t.ReceiveDeferred(buffer, ?cancellationToken) =
-      let cancellationToken = defaultArg cancellationToken CancellationToken.None
+    member t.ReceiveDeferred(buffer, ?cancellation) =
+      let cancellationToken = Cancellation.Option.toToken cancellation
       Deferred.ofTask (t.ReceiveAsync(buffer, cancellationToken))
 
-    member t.SendDeferred(buffer, messageType, endOfMessage, ?cancellationToken) =
-      let cancellationToken = defaultArg cancellationToken CancellationToken.None
+    member t.SendDeferred(buffer, messageType, endOfMessage, ?cancellation) =
+      let cancellationToken = Cancellation.Option.toToken cancellation
       Deferred.ofTaskUnit (t.SendAsync(buffer, messageType, endOfMessage, cancellationToken))

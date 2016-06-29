@@ -25,43 +25,52 @@ module IOExtensions =
     AccessControlSections.Access ||| AccessControlSections.Owner ||| AccessControlSections.Group
 
   type Stream with
-    member t.FlushDeferred() = Deferred.ofTaskUnit (t.FlushAsync())
+    member t.FlushDeferred(?cancellation) =
+      Deferred.ofTaskUnit (t.FlushAsync(Cancellation.Option.toToken cancellation))
 
-    member t.ReadDeferred(buffer, ?offset, ?count) =
+    member t.ReadDeferred(buffer, ?offset, ?count, ?cancellation : Cancellation.T) =
       let offset = defaultArg offset 0
       let count = defaultArg count (Array.length buffer)
-      Deferred.ofBeginEnd
-        (fun callback -> t.BeginRead(buffer, offset, count, callback, null))
-        t.EndRead
+      match cancellation with
+      | Some cancellation ->
+        Deferred.ofTask (t.ReadAsync(buffer, offset, count, Cancellation.toToken cancellation))
+      | None ->
+        Deferred.ofBeginEnd
+          (fun callback -> t.BeginRead(buffer, offset, count, callback, null))
+          t.EndRead
 
-    member t.ReadDeferred(count) =
+    member t.ReadDeferred(count, ?cancellation) =
       let buffer = Array.zeroCreate count
-      t.ReadDeferred(buffer, 0, count)
+      t.ReadDeferred(buffer, 0, count, ?cancellation = cancellation)
       >>| fun bytesRead ->
       if bytesRead = count then
         buffer
       else
         Array.sub buffer 0 bytesRead
 
-    member t.WriteDeferred(buffer, ?offset, ?count) =
+    member t.WriteDeferred(buffer, ?offset, ?count, ?cancellation : Cancellation.T) =
       let offset = defaultArg offset 0
       let count = defaultArg count (Array.length buffer)
-      Deferred.ofBeginEnd
-        (fun callback -> t.BeginWrite(buffer, offset, count, callback, null))
-        t.EndWrite
+      match cancellation with
+      | Some cancellation ->
+        Deferred.ofTaskUnit (t.WriteAsync(buffer, offset, count, Cancellation.toToken cancellation))
+      | None ->
+        Deferred.ofBeginEnd
+          (fun callback -> t.BeginWrite(buffer, offset, count, callback, null))
+          t.EndWrite
 
-    member t.CopyToDeferred(destination : Stream, ?bufferSize) =
+    member t.CopyToDeferred(destination : Stream, ?bufferSize, ?cancellation) =
       let bufferSize = defaultArg bufferSize (20 * 4096)
       let buffer = Array.zeroCreate bufferSize
       let rec loop () =
-        t.ReadDeferred(buffer)
+        t.ReadDeferred(buffer, ?cancellation = cancellation)
         >>= fun readBytes ->
         if readBytes <> 0 then
-          destination.WriteDeferred(buffer, count = readBytes)
+          destination.WriteDeferred(buffer, count = readBytes, ?cancellation = cancellation)
           >>= loop
         else
           Deferred.unit
-      loop ()
+      Cancellation.Option.run cancellation loop
 
   type TextReader with
     member t.ReadDeferred(buffer, ?index, ?count) =

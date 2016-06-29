@@ -6,7 +6,6 @@ open System.IO
 open System.Net
 open System.Net.WebSockets
 open System.Security.Cryptography.X509Certificates
-open System.Threading
 
 [<AutoOpen>]
 module NetExtensions =
@@ -50,7 +49,7 @@ module NetExtensions =
     member GetResponseDeferred : unit -> WebResponse IDeferred
 
   type WebSocket with
-    member CloseDeferred : closeStatus : WebSocketCloseStatus * statusDescription : string * ?cancellationToken : CancellationToken -> unit IDeferred
-    member CloseOutputDeferred : closeStatus : WebSocketCloseStatus * statusDescription : string * ?cancellationToken : CancellationToken -> unit IDeferred
-    member ReceiveDeferred : buffer : byte ArraySegment * ?cancellationToken : CancellationToken -> WebSocketReceiveResult IDeferred
-    member SendDeferred : buffer : byte ArraySegment * messageType : WebSocketMessageType * endOfMessage : bool * ?cancellationToken : CancellationToken -> unit IDeferred
+    member CloseDeferred : closeStatus : WebSocketCloseStatus * statusDescription : string * ?cancellation : Cancellation.T -> unit IDeferred
+    member CloseOutputDeferred : closeStatus : WebSocketCloseStatus * statusDescription : string * ?cancellation : Cancellation.T -> unit IDeferred
+    member ReceiveDeferred : buffer : byte ArraySegment * ?cancellation : Cancellation.T -> WebSocketReceiveResult IDeferred
+    member SendDeferred : buffer : byte ArraySegment * messageType : WebSocketMessageType * endOfMessage : bool * ?cancellation : Cancellation.T -> unit IDeferred
