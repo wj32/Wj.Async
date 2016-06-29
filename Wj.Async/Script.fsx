@@ -193,8 +193,8 @@ let testChoice () =
     let v2 = Deferred.createVar ()
     dontWaitFor (deferred {
       do! afterMs 100
-      () --> v2
-      () --> v1
+      v2 <-- ()
+      v1 <-- ()
     })
     do!
       choose
@@ -267,17 +267,17 @@ let testCycle () =
   Dispatcher.run dispatcher (fun () -> deferred {
     let v1 = Deferred.createVar ()
     let v2 = Deferred.createVar ()
-    v1 >-- v2
-    v2 >-- v1
+    v2 --< v1
+    v1 --< v2
     do! Deferred.anyUnit [v1; v2; afterMs 1000]
     printfn "Waited 1 second - detected cycle!"
 
     let v1 = Deferred.createVar ()
     let v2 = Deferred.createVar ()
     let v3 = Deferred.createVar ()
-    v1 >-- v2
-    v2 >-- v3
-    v3 >-- v1
+    v2 --< v1
+    v3 --< v2
+    v1 --< v3
     do! Deferred.anyUnit [v1; v2; v3; afterMs 1000]
     printfn "Waited 1 second - detected cycle!"
   })

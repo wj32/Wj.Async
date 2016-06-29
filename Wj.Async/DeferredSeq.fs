@@ -53,7 +53,7 @@ module DeferredSeq =
       let rec loop state tail =
         tail
         >>> function
-        | Empty -> state --> v
+        | Empty -> v <-- state
         | Cons (head, tail) -> upon (f state head) (fun state -> loop state tail)
       loop state xs
     )
@@ -109,8 +109,8 @@ module DeferredSeq =
       let rec loop tail =
         tail
         >>> function
-        | Empty -> None --> v
-        | Cons (head, tail) -> f head >>> (fun y -> match y with Some _ -> y --> v | None -> loop tail)
+        | Empty -> v <-- None
+        | Cons (head, tail) -> f head >>> (fun y -> match y with Some _ -> v <-- y | None -> loop tail)
       loop xs
     )
 

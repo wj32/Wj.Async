@@ -32,7 +32,7 @@ module NetExtensions =
             else if args.Error <> null then
               supervisor.SendException(args.Error)
             else
-              createResult args --> v
+              v <-- createResult args
           ))
       handler <- createHandler f
       event.AddHandler(handler)

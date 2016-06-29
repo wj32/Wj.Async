@@ -43,8 +43,8 @@ module Deferred =
     val inline (>>=) : 'a IDeferred -> ('a -> 'b IDeferred) -> 'b IDeferred
     val inline (>>|) : 'a IDeferred -> ('a -> 'b) -> 'b IDeferred
     val inline (>>>) : 'a IDeferred -> ('a -> unit) -> unit
-    val inline (-->) : 'a -> 'a IVar -> unit
-    val inline (>--) : 'a IDeferred -> 'a IVar -> unit
+    val inline (<--) : 'a IVar -> 'a -> unit
+    val inline (--<) : 'a IVar -> 'a IDeferred -> unit
 
   // General
 

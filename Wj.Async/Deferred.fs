@@ -249,8 +249,8 @@ module Deferred =
     let inline (>>=) t f = bind t f
     let inline (>>|) t f = map t f
     let inline (>>>) t f = upon t f
-    let inline (-->) value var = set var value
-    let inline (>--) d var = link var d
+    let inline (<--) var value = set var value
+    let inline (--<) var d = link var d
 
   let allUnit ts = allForget ts
 
@@ -364,7 +364,7 @@ module Deferred =
         | [] -> assert false
         | c :: cs ->
           match c.TryGetApply() with
-          | Some y -> y --> v
+          | Some y -> v <-- y
           | None -> setResult cs
       let mutable registrations = []
       registrations <- choices |> List.map (fun c ->
@@ -385,7 +385,7 @@ module Deferred =
       let rec loop state =
         f state >>> (function
           | Repeat.Repeat state -> loop state
-          | Repeat.Done x -> x --> v
+          | Repeat.Done x -> v <-- x
         )
       loop state
     )
@@ -405,7 +405,7 @@ module Deferred =
         create (fun v ->
           let rec loop i state =
             if i = n - 1 then
-              f i state xs.[i] >-- v
+              v --< f i state xs.[i]
             else
               f i state xs.[i] >>> (fun state -> loop (i + 1) state)
           loop 0 state
@@ -462,9 +462,9 @@ module Deferred =
         create (fun v ->
           let rec loop i =
             if i = n - 1 then
-              f xs.[i] >-- v
+              v --< f xs.[i]
             else
-              f xs.[i] >>> (fun y -> match y with Some _ -> y --> v | None -> loop (i + 1))
+              f xs.[i] >>> (fun y -> match y with Some _ -> v <-- y | None -> loop (i + 1))
           loop 0
         )
 
@@ -513,8 +513,8 @@ module Deferred =
         create (fun v ->
           let rec loop x xs =
             match xs with
-            | [] -> f x >-- v
-            | x' :: xs'' -> f x >>> (fun y -> match y with Some _ -> y --> v | None -> loop x' xs'')
+            | [] -> v --< f x
+            | x' :: xs'' -> f x >>> (fun y -> match y with Some _ -> v <-- y | None -> loop x' xs'')
           loop x xs
         )
 
@@ -536,7 +536,7 @@ module Deferred =
               if e.MoveNext() then
                 f i state e.Current >>> (fun state -> loop (i + 1) state)
               else
-                state --> v
+                v <-- state
             loop 0 state
           )
         ) (fun () -> e.Dispose(); unit)
@@ -599,9 +599,9 @@ module Deferred =
           create (fun v ->
             let rec loop () =
               if e.MoveNext() then
-                f e.Current >>> (fun y -> match y with Some _ -> y --> v | None -> loop ())
+                f e.Current >>> (fun y -> match y with Some _ -> v <-- y | None -> loop ())
               else
-                None --> v
+                v <-- None
             loop ()
           )
         ) (fun () -> e.Dispose(); unit)

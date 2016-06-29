@@ -83,13 +83,13 @@ module Pipe =
     member t.CancelReads() =
       while not (Queue.isEmpty t.pendingReads) do
         match Queue.dequeue t.pendingReads with
-        | PendingRead.Nothing v -> None --> v
-        | PendingRead.Single v -> None --> v
-        | PendingRead.Batch (b, v) -> None --> v
+        | PendingRead.Nothing v -> v <-- None
+        | PendingRead.Single v -> v <-- None
+        | PendingRead.Batch (b, v) -> v <-- None
 
     member inline t.CloseInternal() =
       if not (isClosed t) then
-        () --> t.closed
+        t.closed <-- ()
         t.CancelReads()
         t.UpdateAcceptingWrite()
         true
@@ -99,9 +99,9 @@ module Pipe =
     member t.CompleteReads() =
       while not (Queue.isEmpty t.pendingReads || Queue.isEmpty t.buffer) do
         match Queue.dequeue t.pendingReads with
-        | PendingRead.Nothing v -> Some () --> v
-        | PendingRead.Single v -> Some (Queue.dequeue t.buffer) --> v
-        | PendingRead.Batch (b, v) -> Some (Queue.dequeue' t.buffer (BatchSize.toInt b)) --> v
+        | PendingRead.Nothing v -> v <-- Some ()
+        | PendingRead.Single v -> v <-- Some (Queue.dequeue t.buffer)
+        | PendingRead.Batch (b, v) -> v <-- Some (Queue.dequeue' t.buffer (BatchSize.toInt b))
 
     member t.UpdateAcceptingWrite() =
       if Queue.length t.buffer < t.capacity || isClosed t then
@@ -188,7 +188,7 @@ module Pipe =
         capacity = System.Int32.MaxValue;
         acceptingWrite = Deferred.createVar ();
         pendingReads = Queue.create (); }
-    () --> pipe.acceptingWrite
+    pipe.acceptingWrite <-- ()
     pipe
 
   let create () =
@@ -213,7 +213,7 @@ module Pipe =
         read ()
         >>> function
         | Some x -> upon (f state x) loop
-        | None -> state --> v
+        | None -> v <-- state
       Deferred.unit >>> fun () -> loop state
     )
 
@@ -241,7 +241,7 @@ module Pipe =
 
   let inline createIterGeneric readImmediately f writer reader =
     Deferred.create (fun v ->
-      let inline complete () = () --> v
+      let inline complete () = v <-- ()
       let inline closeReaderAndComplete () = closeReader reader; complete ()
       let rec loop () =
         if isClosed writer then
