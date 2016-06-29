@@ -11,11 +11,14 @@ module CancellationSignal =
   type T = unit IDeferred
   type Source = unit IVar
 
-  module Wrapper =
+  module CancellationTokenWrapper =
     [<ReferenceEquality>]
     type 'a State =
       | Unregistered of token : CancellationToken
-      | Registered of callbacks : 'a SupervisedCallback RegistrationList.T
+      | Registered of
+        token : CancellationToken *
+        registration : CancellationTokenRegistration *
+        callbacks : 'a SupervisedCallback RegistrationList.T
       | Cancelled
 
     // We cannot implement the unit IDeferred interface directly. Here the IDeferred function
@@ -37,10 +40,19 @@ module CancellationSignal =
         Dispatcher.enqueue (Supervisor.dispatcher supervisor) (supervisor, fun () ->
           let execute list = RegistrationList.toList list |> List.iter t.Enqueue
           match t.state with
-          | Unregistered _ -> failwith "Unexpected 'Unregistered' state"
-          | Registered callbacks -> t.state <- Cancelled; execute callbacks
-          | Cancelled -> () // Currently this should never happen, but it is still OK.
+          | Unregistered _ -> ()
+          | Registered (_, _, callbacks) -> t.state <- Cancelled; execute callbacks
+          | Cancelled -> ()
         )
+
+      member t.EmptiedCallback() =
+        match t.state with
+        | Unregistered _ -> failwith "Unexpected 'Unregistered' state"
+        | Registered (token, registration, callbacks) ->
+          assert (RegistrationList.isEmpty callbacks)
+          registration.Dispose()
+          t.state <- Unregistered token
+        | Cancelled -> ()
 
       member inline t.RegisterInternal(register, empty, execute) =
         match t.state with
@@ -51,10 +63,13 @@ module CancellationSignal =
             empty ()
           else
             let callbacks = RegistrationList.create ()
-            token.Register(new Action<obj>(t.CancellationCallback), Supervisor.current ()) |> ignore
-            t.state <- Registered callbacks
-            register callbacks
-        | Registered callbacks -> register callbacks
+            let registration =
+              token.Register(new Action<obj>(t.CancellationCallback), Supervisor.current ())
+            t.state <- Registered (token, registration, callbacks)
+            let result = register callbacks
+            RegistrationList.addEmptiedCallback callbacks t.EmptiedCallback
+            result
+        | Registered (_, _, callbacks) -> register callbacks
         | Cancelled -> execute (); empty ()
 
       interface 'a IDeferred with
@@ -77,11 +92,12 @@ module CancellationSignal =
           )
 
         member t.MoveFrom(from) =
-          t.RegisterInternal(
-            (fun callbacks -> RegistrationList.moveFrom callbacks from),
-            id,
-            (fun () -> RegistrationList.toList from |> List.iter t.Enqueue)
-          )
+          if not (RegistrationList.isEmpty from) then
+            t.RegisterInternal(
+              (fun callbacks -> RegistrationList.moveFrom callbacks from),
+              id,
+              (fun () -> RegistrationList.toList from |> List.iter t.Enqueue)
+            )
 
         member t.IsDetermined =
           match t.state with
@@ -114,7 +130,7 @@ module CancellationSignal =
 
   let raiseIfSet (t : T) = if isSet t then raise (new OperationCanceledException())
 
-  let ofToken token = Wrapper.create token :> T
+  let ofToken token = CancellationTokenWrapper.create token :> T
 
   let toToken t =
     let source = new CancellationTokenSource()

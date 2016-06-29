@@ -7,4 +7,3 @@ module Registration =
   val inline remove : IRegistration -> unit
 
   val empty : IRegistration
-  val fromLinkedListNode : _ LinkedListNode -> IRegistration

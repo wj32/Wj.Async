@@ -10,9 +10,9 @@ module RegistrationList =
     | Singly of value : 'a * rest : 'a State
     | Doubly of linkedList : 'a LinkedList
 
-  type 'a T = {mutable state : 'a State}
+  type 'a T = {mutable state : 'a State; mutable emptiedCallbacks : (unit -> unit) list}
 
-  let create () = {state = Initial}
+  let create () = {state = Initial; emptiedCallbacks = []}
 
   let moveToFromLinkedList (toLinkedList : 'a LinkedList) (fromLinkedList : 'a LinkedList) after start =
     let rec loop (after : _ LinkedListNode) (node : _ LinkedListNode) =
@@ -55,6 +55,23 @@ module RegistrationList =
       t.state <- Doubly linkedList
       linkedList
 
+  let isEmpty t =
+    match t.state with
+    | Initial -> true
+    | Singly _ -> false
+    | Doubly linkedList -> linkedList.Count = 0
+
+  let checkEmpty t =
+    if isEmpty t then
+      t.emptiedCallbacks |> List.iter (fun f -> f ())
+      t.emptiedCallbacks <- []
+
+  let addEmptiedCallback t f =
+    if isEmpty t then
+      f ()
+    else
+      t.emptiedCallbacks <- f :: t.emptiedCallbacks
+
   let add t (x : 'a) =
     match t.state with
     | Doubly linkedList -> linkedList.AddFirst(x) |> ignore
@@ -62,7 +79,18 @@ module RegistrationList =
 
   let register t (x : 'a) =
     let linkedList = ensureDoubly t
-    Registration.fromLinkedListNode (linkedList.AddFirst(x))
+    let mutable node = linkedList.AddFirst(x)
+    let mutable captured = t
+    { new IRegistration with
+        member this.Remove() =
+          match node with
+          | null -> ()
+          | _ ->
+            node.List.Remove(node)
+            node <- null
+            checkEmpty captured
+            captured <- Unchecked.defaultof<'a T> // Fast way of getting rid of our reference to T
+    }
 
   let moveFrom t from =
     let swap () =
@@ -92,10 +120,12 @@ module RegistrationList =
       match toLinkedList.First with
       | null -> swap ()
       | _ -> moveToStartOfLinkedListFromState toLinkedList from.state
+    checkEmpty from
 
-  let clear t = t.state <- Initial
+  let clear t = t.state <- Initial; checkEmpty t
 
-  let ofList list = {state = List.foldBack (fun x acc -> Singly (x, acc)) list Initial}
+  let ofList list =
+    {state = List.foldBack (fun x acc -> Singly (x, acc)) list Initial; emptiedCallbacks = []}
 
   let toList t =
     let rec loop acc state =
