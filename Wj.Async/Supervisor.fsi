@@ -22,10 +22,8 @@ module Supervisor =
 
   val getExceptionDSeq : ISupervisor -> exn DeferredSeq.T
 
-  val supervise
-    : f : (unit -> 'a IDeferred)
-    -> observer : (exn -> unit)
-    -> 'a IDeferred
+  val supervise : f : (unit -> 'a IDeferred) -> observer : (exn -> unit) -> 'a IDeferred
+  val terminateAfterException : f : (unit -> 'a IDeferred) -> 'a IDeferred
 
   module AfterDetermined =
     type T = Raise | Log | Ignore

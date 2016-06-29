@@ -63,12 +63,38 @@ module Supervisor =
     DeferredSeq.create (fun writer -> uponException t (DeferredSeq.Writer.write writer))
 
   let supervise (f : unit -> _ IDeferred) observer =
-    let t = createNamed "Supervisor.supervise"
+    let t = createNamed "supervise"
     uponException t observer
     let result = tryRun t f
     match result with
     | Result.Success d -> d
     | Result.Failure ex -> sendException t ex; Deferred.never ()
+
+  let terminateAfterException (f : unit -> _ IDeferred) =
+    let supervisor = ThreadShared.currentSupervisor ()
+    let t = createNamed "terminateAfterException"
+    detach t
+    let result = tryRun t f
+    match result with
+    | Result.Success d ->
+      if Deferred.isDetermined d then
+        d
+      else
+        let dispatcher = ThreadShared.currentDispatcher ()
+        let reader = Deferred.createVar ()
+        let mutable writer = Some reader
+        uponException t (fun ex ->
+          match writer with
+          | Some v -> writer <- None; terminate t; sendException supervisor ex
+          | None -> ()
+        )
+        Deferred.upon' d (dispatcher.RootSupervisor, fun x ->
+          match writer with
+          | Some v -> writer <- None; Deferred.set v x
+          | None -> ()
+        )
+        reader :> _ IDeferred
+    | Result.Failure ex -> terminate t; sendException supervisor ex; Deferred.never ()
 
   module AfterDetermined =
     type T = Raise | Log | Ignore
@@ -83,10 +109,18 @@ module Supervisor =
     | AfterDetermined.Ignore -> ()
 
   let tryWith (f : unit -> _ IDeferred) (handler : exn -> _ IDeferred) afterDetermined afterException =
+    let dispatcher = ThreadShared.currentDispatcher ()
     let t = createNamed "tryWith"
     detach t
+    // Use the root supervisor whenever possible to avoid memory leaks.
+    let supervisorForAfterDetermined =
+      match afterDetermined with
+      | AfterDetermined.Raise -> ThreadShared.currentSupervisor ()
+      | AfterDetermined.Log -> dispatcher.RootSupervisor
+      | AfterDetermined.Ignore -> dispatcher.RootSupervisor
     let startHandlingAfterDetermined () =
-      uponException t (fun ex -> handleAfterDetermined afterDetermined t.Name ex)
+      uponException' t
+        (supervisorForAfterDetermined, fun ex -> handleAfterDetermined afterDetermined t.Name ex)
     let result = tryRun t f
     match result with
     | Result.Success d ->
@@ -94,10 +128,9 @@ module Supervisor =
         startHandlingAfterDetermined ()
         d
       else
-        let dispatcher = ThreadShared.currentDispatcher ()
         let reader = Deferred.createVar ()
         let mutable writer = Some reader
-        uponException t (fun ex ->
+        uponException' t (supervisorForAfterDetermined, fun ex ->
           match writer with
           | Some v ->
             writer <- None
@@ -107,13 +140,13 @@ module Supervisor =
             | AfterException.Continue -> ()
           | None -> handleAfterDetermined afterDetermined t.Name ex
         )
-        Deferred.upon' d (dispatcher.RootSupervisor, (fun x ->
+        Deferred.upon' d (dispatcher.RootSupervisor, fun x ->
           match writer with
           | Some v ->
             writer <- None
             Deferred.set v x
           | None -> ()
-        ))
+        )
         reader :> _ IDeferred
     | Result.Failure ex ->
       match afterException with

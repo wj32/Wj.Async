@@ -17,6 +17,7 @@ module Cancellation =
 
   val inline isSet : T -> bool
   val raiseIfSet : T -> unit
+  val run : T -> f : (unit -> 'a IDeferred) -> 'a IDeferred
 
   val inline ofSource : Source.T -> T
   val ofToken : CancellationToken -> T

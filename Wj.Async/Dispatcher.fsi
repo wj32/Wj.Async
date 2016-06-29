@@ -8,3 +8,5 @@ module Dispatcher =
 
   val current : unit -> IDispatcher
   val create : unit -> IDispatcher
+
+  val enqueueRoot : IDispatcher -> f : (unit -> unit) -> unit

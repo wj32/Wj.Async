@@ -65,3 +65,5 @@ module Dispatcher =
         rootSupervisor = Unchecked.defaultof<ISupervisor>; }
     t.rootSupervisor <- Supervisor.createRoot t
     t :> IDispatcher
+
+  let enqueueRoot t f = enqueue t (rootSupervisor t, f)
