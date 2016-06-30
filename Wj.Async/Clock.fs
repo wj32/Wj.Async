@@ -7,7 +7,7 @@ module Clock =
   let [<Literal>] SpanCannotBeNegative = "The time span value cannot be negative."
   let [<Literal>] TimeCannotBePast = "The time span value cannot be negative."
 
-  let afterTimer create =
+  let inline afterTimer create =
     let dispatcher = Dispatcher.current ()
     let v = Deferred.createVar ()
     let mutable timer : Timer = null
