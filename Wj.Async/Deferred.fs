@@ -295,17 +295,22 @@ module Deferred =
         let mutable writer = Some reader
         t.UponException(fun ex ->
           match writer with
-          | Some _ -> writer <- None; upon (finalizer ()) (fun () -> supervisor.SendException(ex))
+          | Some _ ->
+            writer <- None
+            t.Terminate()
+            upon (finalizer ()) (fun () -> supervisor.SendException(ex))
           | None -> raiseAfterDetermined ex
         )
         upon d (fun x ->
           match writer with
-          | Some v -> writer <- None; upon (finalizer ()) (fun () -> set v x)
+          | Some v ->
+            writer <- None
+            upon (finalizer ()) (fun () -> set v x)
           | None -> ()
         )
         reader :> _ IDeferred
     | Result.Failure ex ->
-      t.UponException(raiseAfterDetermined)
+      t.Terminate()
       upon (finalizer ()) (fun () -> supervisor.SendException(ex))
       never ()
 
