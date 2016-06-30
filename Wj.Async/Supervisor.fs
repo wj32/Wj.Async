@@ -4,6 +4,7 @@ open System
 
 module Supervisor =
   let [<Literal>] CannotAddHandlerToRoot = "Handlers cannot be registered on the root supervisor."
+  let [<Literal>] RootCannotBeDetached = "The root supervisor cannot be detached."
   let [<Literal>] RootCannotBeTerminated = "The root supervisor cannot be terminated."
 
   // ISupervisor functions
@@ -35,7 +36,7 @@ module Supervisor =
 
         member t.SendException(ex) = raise (SupervisorRootException ex)
 
-        member t.Detach() = ()
+        member t.Detach() = raise (invalidOp RootCannotBeDetached)
 
         member t.IsTerminated = false
 
@@ -47,7 +48,11 @@ module Supervisor =
         member t.UponException(supervisedHandler : exn SupervisedCallback) : unit =
           invalidOp CannotAddHandlerToRoot
 
-        member t.TryRun(f) = Result.tryWith f
+        member t.TryRun(f) =
+          ThreadShared.pushSupervisor t
+          let result = Result.tryWith f
+          ThreadShared.popSupervisor t
+          result
 
     let inline create dispatcher = Root dispatcher
 
@@ -113,13 +118,13 @@ module Supervisor =
     let dispatcher = ThreadShared.currentDispatcher ()
     let t = createNamed "tryWith"
     detach t
-    // Use the root supervisor whenever possible to avoid memory leaks.
-    let supervisorForAfterDetermined =
-      match afterDetermined with
-      | AfterDetermined.Raise -> ThreadShared.currentSupervisor ()
-      | AfterDetermined.Log -> dispatcher.RootSupervisor
-      | AfterDetermined.Ignore -> dispatcher.RootSupervisor
     let startHandlingAfterDetermined () =
+      // Use the root supervisor whenever possible to avoid memory leaks.
+      let supervisorForAfterDetermined =
+        match afterDetermined with
+        | AfterDetermined.Raise -> current ()
+        | AfterDetermined.Log -> dispatcher.RootSupervisor
+        | AfterDetermined.Ignore -> dispatcher.RootSupervisor
       uponException' t
         (supervisorForAfterDetermined, fun ex -> handleAfterDetermined afterDetermined t.Name ex)
     let result = tryRun t f
@@ -131,7 +136,7 @@ module Supervisor =
       else
         let reader = Deferred.createVar ()
         let mutable writer = Some reader
-        uponException' t (supervisorForAfterDetermined, fun ex ->
+        uponException t (fun ex ->
           match writer with
           | Some v ->
             writer <- None
