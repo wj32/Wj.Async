@@ -23,7 +23,7 @@ module Deferred =
   let inline link (t : _ IVar) d = t.Link(d)
   let inline tryLink (t : _ IVar) d = t.TryLink(d)
 
-  let enqueue (supervisor : ISupervisor) f x =
+  let inline enqueue (supervisor : ISupervisor) f x =
     supervisor.Dispatcher.Enqueue((supervisor, fun () -> f x))
 
   module Never =
