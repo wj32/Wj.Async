@@ -8,10 +8,11 @@ module Clock =
   let [<Literal>] TimeCannotBePast = "The time span value cannot be negative."
 
   let afterTimer create =
+    let dispatcher = Dispatcher.current ()
     let v = Deferred.createVar ()
     let mutable timer : Timer = null
     let callback _ =
-      Deferred.set v ()
+      Dispatcher.enqueueRoot dispatcher (fun () -> Deferred.set v ())
       timer.Dispose()
     timer <- create callback
     v :> _ IDeferred
