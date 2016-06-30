@@ -117,12 +117,14 @@ let testExceptions () =
               do! Deferred.unit
               printfn "Caught exception in exception handler that will be caught: %A" ex
             do! Deferred.unit
-            invalidOp "Exception in exception handler!"
+            printfn "Throwing another exception!"
+            invalidOp "Exception in exception handler that will be caught (2)!"
 
           counter <- counter + 1
       with ex ->
         printfn "Caught exception in exception handler: %A" ex
         do! afterMs 2000
+        printfn "Waited 2 seconds in exception handler!"
       return ()
     })
   with ex ->
@@ -386,6 +388,28 @@ let testOfAsync () =
   Dispatcher.run dispatcher (fun () -> deferred {
     try
       do! Deferred.ofAsyncStart a
+    with ex ->
+      printfn "Caught exception: %A" ex
+  })
+
+let testOfTask () =
+  Dispatcher.run dispatcher (fun () -> deferred {
+    try
+      let! x = Deferred.ofTask (Task.Run(new System.Func<int>(fun () -> invalidOp "Test exception 1"; 2)))
+      ignore x
+    with ex ->
+      printfn "Caught exception: %A" ex
+    try
+      do! Deferred.ofTaskUnit (Task.Run(fun () -> invalidOp "Test exception 2"))
+    with ex ->
+      printfn "Caught exception: %A" ex
+    try
+      let! x = Deferred.ofTask (Task.Run(new System.Func<int>(fun () -> raise (new System.OperationCanceledException()); 2)))
+      ignore x
+    with ex ->
+      printfn "Caught exception: %A" ex
+    try
+      do! Deferred.ofTaskUnit (Task.Run(fun () -> raise (new System.OperationCanceledException())))
     with ex ->
       printfn "Caught exception: %A" ex
   })

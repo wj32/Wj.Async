@@ -28,7 +28,7 @@ module NetExtensions =
             completed ()
             event.RemoveHandler(handler)
             if args.Cancelled then
-              supervisor.SendException(new OperationCanceledException())
+              raise (new OperationCanceledException())
             else if args.Error <> null then
               supervisor.SendException(args.Error)
             else

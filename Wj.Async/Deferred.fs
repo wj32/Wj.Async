@@ -335,10 +335,40 @@ module Deferred =
     )
 
   let ofTask (task : 'a Task) =
-    create (fun v -> task.ContinueWith(Action<Task<'a>>(fun _ -> v.Set(task.Result))) |> ignore)
+    create (fun v ->
+      let supervisor = ThreadShared.currentSupervisor ()
+      task.ContinueWith(Action<Task<'a>>(fun _ ->
+        supervisor.Dispatcher.Enqueue((supervisor, fun () ->
+          match task.Exception with
+          | null -> v.Set(task.Result)
+          | _ ->
+            match task.Exception.InnerException with
+            | null -> supervisor.SendException(task.Exception)
+            | _ -> supervisor.SendException(task.Exception.InnerException)
+        ))
+      )) |> ignore
+    )
 
   let ofTaskUnit (task : Task) =
-    create (fun v -> task.ContinueWith(Action<Task>(fun _ -> v.Set(()))) |> ignore)
+    create (fun v ->
+      let supervisor = ThreadShared.currentSupervisor ()
+      task.ContinueWith(Action<Task>(fun _ ->
+        supervisor.Dispatcher.Enqueue((supervisor, fun () ->
+          match task.Exception with
+          | null ->
+            // We need special handling for cancellation because Task does not raise for
+            // OperationCanceledException (even though Task<'a> does).
+            if task.IsCanceled then
+              raise (new OperationCanceledException())
+            else
+              v.Set(())
+          | _ ->
+            match task.Exception.InnerException with
+            | null -> supervisor.SendException(task.Exception)
+            | _ -> supervisor.SendException(task.Exception.InnerException)
+        ))
+      )) |> ignore
+    )
 
   open Infix
 
