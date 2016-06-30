@@ -70,6 +70,7 @@ module Supervisor =
     | Result.Success d -> d
     | Result.Failure ex -> sendException t ex; Deferred.never ()
 
+  // Same as tryFinally, but does not have a finalizer and ignores all after-determined exceptions.
   let terminateAfterException (f : unit -> _ IDeferred) =
     let supervisor = ThreadShared.currentSupervisor ()
     let t = createNamed "terminateAfterException"
