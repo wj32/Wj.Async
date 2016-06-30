@@ -37,7 +37,9 @@ module Cancellation =
       member t.CancellationCallback(param : obj) =
         let supervisor = param :?> ISupervisor
         Dispatcher.enqueue (Supervisor.dispatcher supervisor) (supervisor, fun () ->
-          let execute list = RegistrationList.toList list |> List.iter t.Enqueue
+          let execute list =
+            for supervisedCallback in RegistrationList.toList list do
+              t.Enqueue(supervisedCallback)
           match t.state with
           | Unregistered _ -> ()
           | Registered (_, _, callbacks) -> t.state <- Cancelled; execute callbacks
@@ -95,7 +97,10 @@ module Cancellation =
             t.RegisterInternal(
               (fun callbacks -> RegistrationList.moveFrom callbacks from),
               id,
-              (fun () -> RegistrationList.toList from |> List.iter t.Enqueue)
+              (fun () ->
+                for supervisedCallback in RegistrationList.toList from do
+                  t.Enqueue(supervisedCallback)
+              )
             )
 
         member t.IsDetermined =

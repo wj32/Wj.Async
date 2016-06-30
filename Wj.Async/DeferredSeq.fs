@@ -190,15 +190,17 @@ module DeferredSeq =
     let list = new System.Collections.Generic.List<_>()
     xs |> foldInline (fun l x -> list.Add(x); l) (cast list)
 
-  let ofArray xs = create (fun writer -> xs |> Array.iter (Writer.write writer); Writer.close writer)
+  let ofArray (xs : _ array) =
+    create (fun writer -> for x in xs do Writer.write writer x; Writer.close writer)
 
   let toArray xs = toSystemList id xs >>| (fun list -> list.ToArray())
 
-  let ofList xs = create (fun writer -> xs |> List.iter (Writer.write writer); Writer.close writer)
+  let ofList (xs : _ list) =
+    create (fun writer -> for x in xs do Writer.write writer x; Writer.close writer)
 
   let toList xs = xs |> foldInline (fun acc x -> x :: acc) [] >>| List.rev
 
-  let ofSeq xs = create (fun writer -> xs |> Seq.iter (Writer.write writer); Writer.close writer)
+  let ofSeq xs = create (fun writer -> for x in xs do Writer.write writer x; Writer.close writer)
 
   let toSeq xs =
     xs |> iterInline (fun x -> ())

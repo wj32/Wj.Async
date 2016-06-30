@@ -118,9 +118,7 @@ module Deferred =
         member t.MoveFrom(from) =
           match t.state with
           | Pending callbacks -> RegistrationList.moveFrom callbacks from
-          | Value x ->
-            RegistrationList.toList from
-            |> List.iter (fun (supervisor, f) -> enqueue supervisor f x)
+          | Value x -> for (supervisor, f) in RegistrationList.toList from do enqueue supervisor f x
           | Linked parent -> moveFrom (T<'a>.FindRoot(parent)) from
 
         member t.IsDetermined =
@@ -150,8 +148,7 @@ module Deferred =
           match t.state with
           | Pending callbacks ->
             t.state <- Value x
-            RegistrationList.toList callbacks
-            |> List.iter (fun (supervisor, f) -> enqueue supervisor f x)
+            for (supervisor, f) in RegistrationList.toList callbacks do enqueue supervisor f x
             true
           | _ -> false
 
@@ -257,14 +254,14 @@ module Deferred =
   let both (t1 : 'a IDeferred) (t2 : 'b IDeferred) =
     create (fun v -> upon t1 (fun x1 -> upon t2 (fun x2 -> set v (x1, x2))))
 
-  let mapAnyi (ts : _ IDeferred list) f =
+  let inline mapAnyi (ts : _ IDeferred list) f =
     create (fun v ->
       let dispatcher = ThreadShared.currentDispatcher ()
       let mutable registrations = []
       registrations <- ts |> List.mapi (fun i t ->
         register' t (dispatcher.RootSupervisor, (fun x ->
           if not v.IsDetermined then
-            registrations |> List.iter Registration.remove
+            for registration in registrations do Registration.remove registration
             set v (f i x)
         ))
       )
@@ -405,7 +402,7 @@ module Deferred =
       registrations <- choices |> List.map (fun c ->
         c.Register(ThreadShared.currentSupervisor (), (fun () ->
           if not v.IsDetermined then
-            registrations |> List.iter Registration.remove
+            for registration in registrations do Registration.remove registration
             setResult choices
         ))
       )

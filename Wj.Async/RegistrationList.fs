@@ -63,7 +63,7 @@ module RegistrationList =
 
   let checkEmpty t =
     if isEmpty t then
-      t.emptiedCallbacks |> List.iter (fun f -> f ())
+      for f in t.emptiedCallbacks do f ()
       t.emptiedCallbacks <- []
 
   let addEmptiedCallback t f =

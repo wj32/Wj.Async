@@ -17,11 +17,10 @@ module internal ChildSupervisor =
       member t.Name = t.name
 
       member t.SendException(ex) =
-        t.handlers |> List.iter (fun (supervisor, handler) ->
+        for (supervisor, handler) in t.handlers do
           match supervisor.TryRun(fun () -> handler ex) with
           | Result.Success () -> ()
           | Result.Failure ex -> supervisor.SendException(ex)
-        )
         match t.parent with
         | Some parent ->
           let ex' =
