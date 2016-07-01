@@ -41,13 +41,12 @@ module Dispatcher =
             )
             match f with
             | Some (supervisor, f) ->
-              if not (Supervisor.isTerminated supervisor) then
-                match Supervisor.tryRun supervisor f with
-                | Result.Success () -> ()
-                | Result.Failure ex -> Supervisor.sendException supervisor ex
+              match supervisor.TryRun(f) with
+              | Result.Success () -> ()
+              | Result.Failure ex -> Supervisor.sendException supervisor ex
               loop ()
             | None ->
-              Deferred.get d
+              d.Get()
           let result = loop ()
           result
         finally

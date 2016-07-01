@@ -5,15 +5,12 @@ open System
 module Supervisor =
   let [<Literal>] CannotAddHandlerToRoot = "Handlers cannot be registered on the root supervisor."
   let [<Literal>] RootCannotBeDetached = "The root supervisor cannot be detached."
-  let [<Literal>] RootCannotBeTerminated = "The root supervisor cannot be terminated."
 
   // ISupervisor functions
   let inline dispatcher (t : ISupervisor) = t.Dispatcher
   let inline parent (t : ISupervisor) = t.Parent
   let inline name (t : ISupervisor) = t.Name
   let inline detach (t : ISupervisor) = t.Detach()
-  let inline isTerminated (t : ISupervisor) = t.IsTerminated
-  let inline terminate (t : ISupervisor) = t.Terminate()
   let inline sendException (t : ISupervisor) ex = t.SendException(ex)
   let inline uponException (t : ISupervisor) (handler : exn -> unit) = t.UponException(handler)
   let inline uponException' (t : ISupervisor) (supervisedHandler : exn SupervisedCallback) =
@@ -37,10 +34,6 @@ module Supervisor =
         member t.SendException(ex) = raise (SupervisorRootException ex)
 
         member t.Detach() = raise (invalidOp RootCannotBeDetached)
-
-        member t.IsTerminated = false
-
-        member t.Terminate() = raise (invalidOp RootCannotBeTerminated)
 
         member t.UponException(handler : exn -> unit) : unit =
           invalidOp CannotAddHandlerToRoot
@@ -75,38 +68,8 @@ module Supervisor =
     | Result.Success d -> d
     | Result.Failure ex -> sendException t ex; Deferred.never ()
 
-  // Same as tryFinally, but does not have a finalizer and ignores all after-determined exceptions.
-  let terminateAfterException (f : unit -> _ IDeferred) =
-    let supervisor = ThreadShared.currentSupervisor ()
-    let t = createNamed "terminateAfterException"
-    detach t
-    let result = tryRun t f
-    match result with
-    | Result.Success d ->
-      if Deferred.isDetermined d then
-        d
-      else
-        let dispatcher = ThreadShared.currentDispatcher ()
-        let reader = Deferred.createVar ()
-        let mutable writer = Some reader
-        uponException t (fun ex ->
-          match writer with
-          | Some v -> writer <- None; terminate t; sendException supervisor ex
-          | None -> ()
-        )
-        Deferred.upon' d (dispatcher.RootSupervisor, fun x ->
-          match writer with
-          | Some v -> writer <- None; Deferred.set v x
-          | None -> ()
-        )
-        reader :> _ IDeferred
-    | Result.Failure ex -> terminate t; sendException supervisor ex; Deferred.never ()
-
   module AfterDetermined =
     type T = Raise | Log | Ignore
-
-  module AfterException =
-    type T = Terminate | Continue
 
   let handleAfterDetermined afterDetermined supervisorName ex =
     match afterDetermined with
@@ -114,7 +77,7 @@ module Supervisor =
     | AfterDetermined.Log -> stderr.WriteLine(sprintf "Unhandled exception after tryWith:\n%s" (string ex))
     | AfterDetermined.Ignore -> ()
 
-  let tryWith (f : unit -> _ IDeferred) (handler : exn -> _ IDeferred) afterDetermined afterException =
+  let tryWith (f : unit -> _ IDeferred) (handler : exn -> _ IDeferred) afterDetermined =
     let dispatcher = ThreadShared.currentDispatcher ()
     let t = createNamed "tryWith"
     detach t
@@ -141,9 +104,6 @@ module Supervisor =
           | Some v ->
             writer <- None
             Deferred.link v (handler ex)
-            match afterException with
-            | AfterException.Terminate -> terminate t
-            | AfterException.Continue -> ()
           | None -> handleAfterDetermined afterDetermined t.Name ex
         )
         Deferred.upon' d (dispatcher.RootSupervisor, fun x ->
@@ -155,9 +115,7 @@ module Supervisor =
         )
         reader :> _ IDeferred
     | Result.Failure ex ->
-      match afterException with
-      | AfterException.Terminate -> terminate t
-      | AfterException.Continue -> startHandlingAfterDetermined ()
+      startHandlingAfterDetermined ()
       handler ex
 
   let tryFinally f finalizer = Deferred.tryFinally f finalizer

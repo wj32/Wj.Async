@@ -8,8 +8,6 @@ module Supervisor =
   val inline parent : ISupervisor -> ISupervisor option
   val inline name : ISupervisor -> string
   val inline detach : ISupervisor -> unit
-  val inline isTerminated : ISupervisor -> bool
-  val inline terminate : ISupervisor -> unit
   val inline sendException : ISupervisor -> ex : exn -> unit
   val inline uponException : ISupervisor -> handler : (exn -> unit) -> unit
   val inline uponException' : ISupervisor -> supervisedHandler : exn SupervisedCallback -> unit
@@ -22,20 +20,18 @@ module Supervisor =
 
   val getExceptionDSeq : ISupervisor -> exn DeferredSeq.T
 
-  val supervise : f : (unit -> 'a IDeferred) -> observer : (exn -> unit) -> 'a IDeferred
-  val terminateAfterException : f : (unit -> 'a IDeferred) -> 'a IDeferred
+  val supervise
+    : f : (unit -> 'a IDeferred)
+    -> observer : (exn -> unit)
+    -> 'a IDeferred
 
   module AfterDetermined =
     type T = Raise | Log | Ignore
-
-  module AfterException =
-    type T = Terminate | Continue
 
   val tryWith
     : f : (unit -> 'a IDeferred)
     -> handler : (exn -> 'a IDeferred)
     -> afterDetermined : AfterDetermined.T
-    -> afterException : AfterException.T
     -> 'a IDeferred
 
   val tryFinally

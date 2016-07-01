@@ -141,12 +141,6 @@ module Cancellation =
 
   let raiseIfSet (t : T) = if isSet t then raise (new OperationCanceledException())
 
-  let run t f =
-    Supervisor.terminateAfterException (fun () ->
-      t >>> fun () -> raise (new OperationCanceledException())
-      f ()
-    )
-
   let inline ofSource (source : Source.T) = source :> T
 
   let ofToken token = CancellationTokenWrapper.create token :> T
@@ -157,11 +151,11 @@ module Cancellation =
     source.Token
 
   module Option =
+    let inline join t = match t with Some t -> t | None -> never
+
     let inline isSet (t : T option) = match t with Some t -> isSet t | None -> false
 
     let inline raiseIfSet (t : T option) = match t with Some t -> raiseIfSet t | None -> ()
-
-    let inline run (t : T option) f = match t with Some t -> run t f | None -> f ()
 
     let inline ofSource source = Some (ofSource source)
 

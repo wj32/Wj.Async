@@ -6,7 +6,6 @@ module internal ChildSupervisor =
     { name : string;
       mutable dispatcher : IDispatcher;
       mutable parent : ISupervisor option;
-      mutable isTerminated : bool;
       mutable handlers : exn SupervisedCallback list; }
 
     interface ISupervisor with
@@ -34,10 +33,6 @@ module internal ChildSupervisor =
 
       member t.Detach() = t.parent <- None
 
-      member t.IsTerminated = t.isTerminated
-
-      member t.Terminate() = t.isTerminated <- true
-
       member t.UponException(handler) =
         (t :> ISupervisor).UponException((ThreadShared.currentSupervisor (), handler))
 
@@ -54,6 +49,5 @@ module internal ChildSupervisor =
     { name = name;
       dispatcher = ThreadShared.currentDispatcher ();
       parent = ThreadShared.tryCurrentSupervisor ();
-      isTerminated = false;
       handlers = []; }
     :> ISupervisor

@@ -29,7 +29,7 @@ module DeferredBuilder =
       Supervisor.tryFinally body (fun () -> finalizer (); Deferred.unit)
 
     member inline this.TryWith(body, handler) =
-      Supervisor.tryWith body handler Supervisor.AfterDetermined.Log Supervisor.AfterException.Terminate
+      Supervisor.tryWith body handler Supervisor.AfterDetermined.Log
 
     member inline this.Using(disposable : #IDisposable, body) =
       // TODO: If disposable is a struct, it will get boxed in the check below. Find a way of handling
