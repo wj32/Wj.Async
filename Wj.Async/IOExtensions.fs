@@ -62,7 +62,7 @@ module IOExtensions =
     member t.CopyToDeferred(destination : Stream, ?bufferSize, ?cancellation) =
       let bufferSize = defaultArg bufferSize (20 * 4096)
       let buffer = Array.zeroCreate bufferSize
-      let rec loop () = deferred {
+      let rec loop () = cancellableDeferred cancellation {
         let! readBytes = t.ReadDeferred(buffer, ?cancellation = cancellation)
         if readBytes <> 0 then
           do! destination.WriteDeferred(buffer, count = readBytes, ?cancellation = cancellation)
@@ -111,17 +111,17 @@ module IOExtensions =
 
     static member inline WrapSimple2 x y f = Deferred.start (fun () -> f(x, y))
 
-    static member AppendAllLinesDeferred(path, contents : string seq, ?encoding) =
+    static member AppendAllLinesDeferred(path, contents : string seq, ?encoding, ?cancellation) =
       let encoding = defaultArg encoding utf8NoBomEncoding
-      deferred {
+      cancellableDeferred cancellation {
         use! writer = Deferred.start (fun () -> new StreamWriter(path, true, encoding))
         for line in contents do
           do! writer.WriteLineDeferred(line)
       }
 
-    static member AppendAllTextDeferred(path, contents : string, ?encoding) =
+    static member AppendAllTextDeferred(path, contents : string, ?encoding, ?cancellation) =
       let encoding = defaultArg encoding utf8NoBomEncoding
-      deferred {
+      cancellableDeferred cancellation {
         use! writer = Deferred.start (fun () -> new StreamWriter(path, true, encoding))
         do! writer.WriteDeferred(contents)
       }
@@ -191,8 +191,8 @@ module IOExtensions =
 
     static member OpenWriteDeferred(path) = File.OpenWrite |> File.WrapSimple path
 
-    static member ReadAllBytesDeferred(path) =
-      deferred {
+    static member ReadAllBytesDeferred(path, ?cancellation) =
+      cancellableDeferred cancellation {
         use! stream = File.OpenDeferred(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096)
         if stream.Length > int64 Int32.MaxValue then
           raise (new IOException(FileTooLong2GB))
@@ -200,7 +200,7 @@ module IOExtensions =
         let mutable index = 0
         let buffer = Array.zeroCreate remaining
         while remaining > 0 do
-          let! bytesRead = stream.ReadDeferred(buffer, index, remaining)
+          let! bytesRead = stream.ReadDeferred(buffer, index, remaining, ?cancellation = cancellation)
           if bytesRead = 0 then
             raise (new EndOfStreamException())
           index <- index + bytesRead
@@ -264,15 +264,15 @@ module IOExtensions =
     static member SetLastWriteTimeUtcDeferred(path, lastWriteTimeUtc) =
       File.SetLastWriteTimeUtc |> File.WrapSimple2 path lastWriteTimeUtc
 
-    static member WriteAllBytesDeferred(path, bytes) =
+    static member WriteAllBytesDeferred(path, bytes, ?cancellation) =
       deferred {
         use! stream = File.OpenDeferred(path, FileMode.Create, FileAccess.Write, FileShare.Read, 4096)
-        do! stream.WriteDeferred(bytes)
+        do! stream.WriteDeferred(bytes, ?cancellation = cancellation)
       }
 
-    static member WriteAllLinesDeferred(path, contents : string seq, ?encoding) =
+    static member WriteAllLinesDeferred(path, contents : string seq, ?encoding, ?cancellation) =
       let encoding = defaultArg encoding utf8NoBomEncoding
-      deferred {
+      cancellableDeferred cancellation {
         use! writer = Deferred.start (fun () -> new StreamWriter(path, false, encoding))
         for line in contents do
           do! writer.WriteLineDeferred(line)

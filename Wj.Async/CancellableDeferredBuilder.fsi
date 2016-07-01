@@ -2,12 +2,13 @@
 
 open System
 
-module DeferredBuilder =
+module CancellableDeferredBuilder =
   type 'a T = 'a IDeferred
   type 'a M = 'a T
 
   type B =
-    new : unit -> B
+    new : Cancellation.T option -> B
+    member RaiseIfCancelled : unit -> unit
     member inline Bind : 'a M * ('a -> 'b M) -> 'b M
     member inline Combine : unit M * (unit -> 'b M) -> 'b M
     member inline Delay : 'f -> 'f

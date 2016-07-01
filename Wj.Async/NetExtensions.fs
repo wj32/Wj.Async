@@ -16,7 +16,8 @@ module NetExtensions =
   type UPCEA = UploadProgressChangedEventArgs
 
   let inline webClientAsyncInner
-    beforeStart completed (event : IEvent<_, _>) createHandler start createResult
+    (t : WebClient) (cancellation : Cancellation.T option) beforeStart completed
+    (event : IEvent<_, _>) createHandler start createResult
     =
     let supervisor = Supervisor.current ()
     Deferred.create (fun v ->
@@ -38,13 +39,17 @@ module NetExtensions =
       event.AddHandler(handler)
       beforeStart token
       start token
+      match cancellation with
+      | Some cancellation -> cancellation >>> (fun () -> t.CancelAsync())
+      | None -> ()
     )
 
-  let inline webClientAsync event createHandler start createResult =
-    webClientAsyncInner (fun token -> ()) id event createHandler start createResult
+  let inline webClientAsync t cancellation event createHandler start createResult =
+    webClientAsyncInner t cancellation (fun token -> ()) id event createHandler start createResult
 
   let inline webClientAsyncWithProgress
-    (progressEvent : IEvent<_, _>) createProgressHandler event createHandler start createResult
+    t cancellation (progressEvent : IEvent<_, _>) createProgressHandler
+    event createHandler start createResult
     =
     let (writer, reader) = Pipe.create ()
     let mutable handler = null
@@ -56,7 +61,7 @@ module NetExtensions =
         progressEvent.RemoveHandler(handler)
         handler <- null
     let d =
-      webClientAsyncInner (fun token ->
+      webClientAsyncInner t cancellation (fun token ->
         let f _ (args : #ProgressChangedEventArgs) =
           if obj.ReferenceEquals(args.UserState, token) then
             if Pipe.isClosed writer then
@@ -111,8 +116,8 @@ module NetExtensions =
         t.EndGetClientCertificate
 
   type WebClient with
-    member inline t.DownloadAsyncWithProgress event createHandler start createResult =
-      webClientAsyncWithProgress t.DownloadProgressChanged
+    member inline t.DownloadAsyncWithProgress cancellation event createHandler start createResult =
+      webClientAsyncWithProgress t cancellation t.DownloadProgressChanged
         (fun f -> new DownloadProgressChangedEventHandler(f)) event createHandler start createResult
 
     member inline t.DownloadDataArgs address action =
@@ -122,11 +127,11 @@ module NetExtensions =
         (fun token -> t.DownloadDataAsync(address, token))
         (fun (args : DownloadDataCompletedEventArgs) -> args.Result)
 
-    member t.DownloadDataDeferred(address) =
-      webClientAsync |> t.DownloadDataArgs address
+    member t.DownloadDataDeferred(address, ?cancellation) =
+      webClientAsync t cancellation |> t.DownloadDataArgs address
 
-    member t.DownloadDataDeferredWithProgress(address) =
-      t.DownloadAsyncWithProgress |> t.DownloadDataArgs address
+    member t.DownloadDataDeferredWithProgress(address, ?cancellation) =
+      t.DownloadAsyncWithProgress cancellation |> t.DownloadDataArgs address
 
     member inline t.DownloadFileArgs address fileName f =
       f
@@ -135,11 +140,11 @@ module NetExtensions =
         (fun token -> t.DownloadFileAsync(address, fileName, token))
         (fun (args : AsyncCompletedEventArgs) -> ())
 
-    member t.DownloadFileDeferred(address, fileName) =
-      webClientAsync |> t.DownloadFileArgs address fileName
+    member t.DownloadFileDeferred(address, fileName, ?cancellation) =
+      webClientAsync t cancellation |> t.DownloadFileArgs address fileName
 
-    member t.DownloadFileDeferredWithProgress(address, fileName) =
-      t.DownloadAsyncWithProgress |> t.DownloadFileArgs address fileName
+    member t.DownloadFileDeferredWithProgress(address, fileName, ?cancellation) =
+      t.DownloadAsyncWithProgress cancellation |> t.DownloadFileArgs address fileName
 
     member inline t.DownloadStringArgs address f =
       f
@@ -148,28 +153,32 @@ module NetExtensions =
         (fun token -> t.DownloadStringAsync(address, token))
         (fun (args : DownloadStringCompletedEventArgs) -> args.Result)
 
-    member t.DownloadStringDeferred(address) =
-      webClientAsync |> t.DownloadStringArgs address
+    member t.DownloadStringDeferred(address, ?cancellation) =
+      webClientAsync t cancellation |> t.DownloadStringArgs address
 
-    member t.DownloadStringDeferredWithProgress(address) =
-      t.DownloadAsyncWithProgress |> t.DownloadStringArgs address
+    member t.DownloadStringDeferredWithProgress(address, ?cancellation) =
+      t.DownloadAsyncWithProgress cancellation |> t.DownloadStringArgs address
 
-    member t.OpenReadDeferred(address) =
+    member t.OpenReadDeferred(address, ?cancellation) =
       webClientAsync
+        t
+        cancellation
         t.OpenReadCompleted
         (fun f -> new OpenReadCompletedEventHandler(f))
         (fun token -> t.OpenReadAsync(address, token))
         (fun args -> args.Result)
 
-    member t.OpenWriteDeferred(address, ?requestMethod) =
+    member t.OpenWriteDeferred(address, ?requestMethod, ?cancellation) =
       webClientAsync
+        t
+        cancellation
         t.OpenWriteCompleted
         (fun f -> new OpenWriteCompletedEventHandler(f))
         (fun token -> t.OpenWriteAsync(address, defaultArg requestMethod null, token))
         (fun args -> args.Result)
 
-    member inline t.UploadAsyncWithProgress event createHandler start createResult =
-      webClientAsyncWithProgress t.UploadProgressChanged
+    member inline t.UploadAsyncWithProgress cancellation event createHandler start createResult =
+      webClientAsyncWithProgress t cancellation t.UploadProgressChanged
         (fun f -> new UploadProgressChangedEventHandler(f)) event createHandler start createResult
 
     member inline t.UploadDataArgs address data requestMethod f =
@@ -179,11 +188,11 @@ module NetExtensions =
         (fun token -> t.UploadDataAsync(address, defaultArg requestMethod null, data))
         (fun (args : UploadDataCompletedEventArgs) -> args.Result)
 
-    member t.UploadDataDeferred(address, data, ?requestMethod) =
-      webClientAsync |> t.UploadDataArgs address data requestMethod
+    member t.UploadDataDeferred(address, data, ?requestMethod, ?cancellation) =
+      webClientAsync t cancellation |> t.UploadDataArgs address data requestMethod
 
-    member t.UploadDataDeferredWithProgress(address, data, ?requestMethod) =
-      t.UploadAsyncWithProgress |> t.UploadDataArgs address data requestMethod
+    member t.UploadDataDeferredWithProgress(address, data, ?requestMethod, ?cancellation) =
+      t.UploadAsyncWithProgress cancellation |> t.UploadDataArgs address data requestMethod
 
     member inline t.UploadFileArgs address fileName requestMethod f =
       f
@@ -192,11 +201,11 @@ module NetExtensions =
         (fun token -> t.UploadFileAsync(address, defaultArg requestMethod null, fileName))
         (fun (args : UploadFileCompletedEventArgs) -> args.Result)
 
-    member t.UploadFileDeferred(address, fileName, ?requestMethod) =
-      webClientAsync |> t.UploadFileArgs address fileName requestMethod
+    member t.UploadFileDeferred(address, fileName, ?requestMethod, ?cancellation) =
+      webClientAsync t cancellation |> t.UploadFileArgs address fileName requestMethod
 
-    member t.UploadFileDeferredWithProgress(address, fileName, ?requestMethod) =
-      t.UploadAsyncWithProgress |> t.UploadFileArgs address fileName requestMethod
+    member t.UploadFileDeferredWithProgress(address, fileName, ?requestMethod, ?cancellation) =
+      t.UploadAsyncWithProgress cancellation |> t.UploadFileArgs address fileName requestMethod
 
     member inline t.UploadStringArgs address data requestMethod f =
       f
@@ -205,11 +214,11 @@ module NetExtensions =
         (fun token -> t.UploadStringAsync(address, defaultArg requestMethod null, data))
         (fun (args : UploadStringCompletedEventArgs) -> args.Result)
 
-    member t.UploadStringDeferred(address, data, ?requestMethod) =
-      webClientAsync |> t.UploadStringArgs address data requestMethod
+    member t.UploadStringDeferred(address, data, ?requestMethod, ?cancellation) =
+      webClientAsync t cancellation |> t.UploadStringArgs address data requestMethod
 
-    member t.UploadStringDeferredWithProgress(address, data, ?requestMethod) =
-      t.UploadAsyncWithProgress |> t.UploadStringArgs address data requestMethod
+    member t.UploadStringDeferredWithProgress(address, data, ?requestMethod, ?cancellation) =
+      t.UploadAsyncWithProgress cancellation |> t.UploadStringArgs address data requestMethod
 
     member inline t.UploadValuesArgs address data requestMethod f =
       f
@@ -218,11 +227,11 @@ module NetExtensions =
         (fun token -> t.UploadValuesAsync(address, defaultArg requestMethod null, data))
         (fun (args : UploadValuesCompletedEventArgs) -> args.Result)
 
-    member t.UploadValuesDeferred(address, data, ?requestMethod) =
-      webClientAsync |> t.UploadValuesArgs address data requestMethod
+    member t.UploadValuesDeferred(address, data, ?requestMethod, ?cancellation) =
+      webClientAsync t cancellation |> t.UploadValuesArgs address data requestMethod
 
-    member t.UploadValuesDeferredWithProgress(address, data, ?requestMethod) =
-      t.UploadAsyncWithProgress |> t.UploadValuesArgs address data requestMethod
+    member t.UploadValuesDeferredWithProgress(address, data, ?requestMethod, ?cancellation) =
+      t.UploadAsyncWithProgress cancellation |> t.UploadValuesArgs address data requestMethod
 
   type WebRequest with
     member t.GetRequestStreamDeferred() =

@@ -20,8 +20,9 @@
 #load "DeferredBuilder.fs"
 #load "DeferredSeqBuilder.fs"
 #load "Pipe.fs"
-#load "Operators.fs"
 #load "Cancellation.fs"
+#load "CancellableDeferredBuilder.fs"
+#load "Operators.fs"
 #load "IOExtensions.fs"
 #load "NetExtensions.fs"
 

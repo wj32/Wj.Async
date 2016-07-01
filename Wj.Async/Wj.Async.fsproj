@@ -76,9 +76,11 @@
     <Compile Include="DeferredSeqBuilder.fs" />
     <Compile Include="Pipe.fsi" />
     <Compile Include="Pipe.fs" />
-    <Compile Include="Operators.fs" />
     <Compile Include="Cancellation.fsi" />
     <Compile Include="Cancellation.fs" />
+    <Compile Include="CancellableDeferredBuilder.fsi" />
+    <Compile Include="CancellableDeferredBuilder.fs" />
+    <Compile Include="Operators.fs" />
     <Compile Include="IOExtensions.fsi" />
     <Compile Include="IOExtensions.fs" />
     <Compile Include="NetExtensions.fsi" />

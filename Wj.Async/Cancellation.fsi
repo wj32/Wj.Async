@@ -15,7 +15,7 @@ module Cancellation =
   val never : T
 
   val inline isSet : T -> bool
-  val raiseIfSet : T -> unit
+  val inline raiseIfSet : T -> unit
 
   val inline ofSource : Source.T -> T
   val ofToken : CancellationToken -> T

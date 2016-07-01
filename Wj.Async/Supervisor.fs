@@ -101,16 +101,12 @@ module Supervisor =
         let mutable writer = Some reader
         uponException t (fun ex ->
           match writer with
-          | Some v ->
-            writer <- None
-            Deferred.link v (handler ex)
+          | Some v -> writer <- None; Deferred.link v (handler ex)
           | None -> handleAfterDetermined afterDetermined t.Name ex
         )
         Deferred.upon' d (dispatcher.RootSupervisor, fun x ->
           match writer with
-          | Some v ->
-            writer <- None
-            Deferred.set v x
+          | Some v -> writer <- None; Deferred.set v x
           | None -> ()
         )
         reader :> _ IDeferred

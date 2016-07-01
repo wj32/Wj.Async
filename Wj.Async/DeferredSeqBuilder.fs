@@ -45,7 +45,7 @@ module DeferredSeqBuilder =
           let v = Deferred.createVar ()
           let rec loop () =
             body writer >>> (fun () ->
-              upon (guard ()) (fun b -> v <-- if b then loop () else ())
+              upon (guard ()) (fun b -> if b then loop () else v <-- ())
             )
           loop ()
           v :> _ IDeferred

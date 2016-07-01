@@ -4,6 +4,7 @@
 module Operators =
   let after = Clock.after
   let afterMs = Clock.afterMs
+  let inline cancellableDeferred cancellable = new CancellableDeferredBuilder.B(cancellable)
   let choice = Deferred.choice
   let choose = Deferred.choose
   let deferred = new DeferredBuilder.B()

@@ -139,7 +139,7 @@ module Cancellation =
 
   let inline isSet (t : T) = Deferred.isDetermined t
 
-  let raiseIfSet (t : T) = if isSet t then raise (new OperationCanceledException())
+  let inline raiseIfSet (t : T) = if isSet t then raise (new OperationCanceledException())
 
   let inline ofSource (source : Source.T) = source :> T
 

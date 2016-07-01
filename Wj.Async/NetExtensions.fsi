@@ -27,22 +27,22 @@ module NetExtensions =
     member GetClientCertificateDeferred : unit -> X509Certificate2 IDeferred
 
   type WebClient with
-    member DownloadDataDeferred : address : Uri -> byte array IDeferred
-    member DownloadDataDeferredWithProgress : address : Uri -> byte array IDeferred * DPCEA Pipe.IReader
-    member DownloadFileDeferred : address : Uri * fileName : string -> unit IDeferred
-    member DownloadFileDeferredWithProgress : address : Uri * fileName : string -> unit IDeferred * DPCEA Pipe.IReader
-    member DownloadStringDeferred : address : Uri -> string IDeferred
-    member DownloadStringDeferredWithProgress : address : Uri -> string IDeferred * DPCEA Pipe.IReader
-    member OpenReadDeferred : address : Uri -> Stream IDeferred
-    member OpenWriteDeferred : address : Uri * ?requestMethod : string -> Stream IDeferred
-    member UploadDataDeferred : address : Uri * data : byte array * ?requestMethod : string -> byte array IDeferred
-    member UploadDataDeferredWithProgress : address : Uri * data : byte array * ?requestMethod : string -> byte array IDeferred * UPCEA Pipe.IReader
-    member UploadFileDeferred : address : Uri * fileName : string * ?requestMethod : string -> byte array IDeferred
-    member UploadFileDeferredWithProgress : address : Uri * fileName : string * ?requestMethod : string -> byte array IDeferred * UPCEA Pipe.IReader
-    member UploadStringDeferred : address : Uri * data : string * ?requestMethod : string -> string IDeferred
-    member UploadStringDeferredWithProgress : address : Uri * data : string * ?requestMethod : string -> string IDeferred * UPCEA Pipe.IReader
-    member UploadValuesDeferred : address : Uri * data : NameValueCollection * ?requestMethod : string -> byte array IDeferred
-    member UploadValuesDeferredWithProgress : address : Uri * data : NameValueCollection * ?requestMethod : string -> byte array IDeferred * UPCEA Pipe.IReader
+    member DownloadDataDeferred : address : Uri * ?cancellation : Cancellation.T -> byte array IDeferred
+    member DownloadDataDeferredWithProgress : address : Uri * ?cancellation : Cancellation.T -> byte array IDeferred * DPCEA Pipe.IReader
+    member DownloadFileDeferred : address : Uri * fileName : string * ?cancellation : Cancellation.T -> unit IDeferred
+    member DownloadFileDeferredWithProgress : address : Uri * fileName : string * ?cancellation : Cancellation.T -> unit IDeferred * DPCEA Pipe.IReader
+    member DownloadStringDeferred : address : Uri * ?cancellation : Cancellation.T -> string IDeferred
+    member DownloadStringDeferredWithProgress : address : Uri * ?cancellation : Cancellation.T -> string IDeferred * DPCEA Pipe.IReader
+    member OpenReadDeferred : address : Uri * ?cancellation : Cancellation.T -> Stream IDeferred
+    member OpenWriteDeferred : address : Uri * ?requestMethod : string * ?cancellation : Cancellation.T -> Stream IDeferred
+    member UploadDataDeferred : address : Uri * data : byte array * ?requestMethod : string * ?cancellation : Cancellation.T -> byte array IDeferred
+    member UploadDataDeferredWithProgress : address : Uri * data : byte array * ?requestMethod : string * ?cancellation : Cancellation.T -> byte array IDeferred * UPCEA Pipe.IReader
+    member UploadFileDeferred : address : Uri * fileName : string * ?requestMethod : string * ?cancellation : Cancellation.T -> byte array IDeferred
+    member UploadFileDeferredWithProgress : address : Uri * fileName : string * ?requestMethod : string * ?cancellation : Cancellation.T -> byte array IDeferred * UPCEA Pipe.IReader
+    member UploadStringDeferred : address : Uri * data : string * ?requestMethod : string * ?cancellation : Cancellation.T -> string IDeferred
+    member UploadStringDeferredWithProgress : address : Uri * data : string * ?requestMethod : string * ?cancellation : Cancellation.T -> string IDeferred * UPCEA Pipe.IReader
+    member UploadValuesDeferred : address : Uri * data : NameValueCollection * ?requestMethod : string * ?cancellation : Cancellation.T -> byte array IDeferred
+    member UploadValuesDeferredWithProgress : address : Uri * data : NameValueCollection * ?requestMethod : string * ?cancellation : Cancellation.T -> byte array IDeferred * UPCEA Pipe.IReader
 
   type WebRequest with
     member GetRequestStreamDeferred : unit -> Stream IDeferred

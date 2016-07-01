@@ -30,8 +30,8 @@ module IOExtensions =
     member WriteLineDeferred : buffer : char array * ?index : int * ?count : int -> unit IDeferred
 
   type File with
-    static member AppendAllLinesDeferred : path : string * contents : string seq * ?encoding : Encoding -> unit IDeferred
-    static member AppendAllTextDeferred : path : string * contents : string * ?encoding : Encoding -> unit IDeferred
+    static member AppendAllLinesDeferred : path : string * contents : string seq * ?encoding : Encoding * ?cancellation : Cancellation.T -> unit IDeferred
+    static member AppendAllTextDeferred : path : string * contents : string * ?encoding : Encoding * ?cancellation : Cancellation.T -> unit IDeferred
     static member CopyDeferred : sourceFileName : string * destFileName : string * ?overwrite : bool -> unit IDeferred
     static member CreateDeferred : path : string * ?bufferSize : int * ?options : FileOptions * ?fileSecurity : FileSecurity -> FileStream IDeferred
     static member CreateTextDeferred : path : string -> StreamWriter IDeferred
@@ -52,7 +52,7 @@ module IOExtensions =
     static member OpenReadDeferred : path : string -> FileStream IDeferred
     static member OpenTextDeferred : path : string * ?encoding : Encoding -> StreamReader IDeferred
     static member OpenWriteDeferred : path : string -> FileStream IDeferred
-    static member ReadAllBytesDeferred : path : string -> byte array IDeferred
+    static member ReadAllBytesDeferred : path : string * ?cancellation : Cancellation.T -> byte array IDeferred
     static member ReadAllLinesDeferred : path : string * ?encoding : Encoding -> string array IDeferred
     static member ReadAllTextDeferred : path : string * ?encoding : Encoding -> string IDeferred
     static member ReadLinesDeferred : path : string * ?encoding : Encoding -> string Pipe.IReader
@@ -65,6 +65,6 @@ module IOExtensions =
     static member SetLastAccessTimeUtcDeferred : path : string * lastAccessTimeUtc : DateTime -> unit IDeferred
     static member SetLastWriteTimeDeferred : path : string * lastWriteTime : DateTime -> unit IDeferred
     static member SetLastWriteTimeUtcDeferred : path : string * lastWriteTimeUtc : DateTime -> unit IDeferred
-    static member WriteAllBytesDeferred : path : string * bytes : byte array -> unit IDeferred
-    static member WriteAllLinesDeferred : path : string * contents : string seq * ?encoding : Encoding -> unit IDeferred
+    static member WriteAllBytesDeferred : path : string * bytes : byte array * ?cancellation : Cancellation.T -> unit IDeferred
+    static member WriteAllLinesDeferred : path : string * contents : string seq * ?encoding : Encoding * ?cancellation : Cancellation.T -> unit IDeferred
     static member WriteAllTextDeferred : path : string * contents : string * ?encoding : Encoding -> unit IDeferred
