@@ -141,6 +141,14 @@ module Cancellation =
 
   let inline raiseIfSet (t : T) = if isSet t then raise (new OperationCanceledException())
 
+  let run (f : unit -> _ IDeferred) =
+    let supervisor = Supervisor.current ()
+    Supervisor.tryWith (fun () -> f () >>| Some) (fun ex ->
+      match ex with
+      | :? OperationCanceledException -> Deferred.value None
+      | _ -> Supervisor.sendException supervisor ex; Deferred.never ()
+    ) Supervisor.AfterDetermined.Ignore
+
   let inline ofSource (source : Source.T) = source :> T
 
   let ofToken token = CancellationTokenWrapper.create token :> T
