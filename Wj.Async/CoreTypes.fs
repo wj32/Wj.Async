@@ -1,11 +1,16 @@
 ﻿namespace Wj.Async
 
 open System
+open System.Collections.Generic
 
 type [<Interface>] IDispatcher =
+  inherit IDisposable
+
   abstract member Enqueue : supervisedCallback : unit SupervisedCallback -> unit
   abstract member Run : f : (unit -> 'a IDeferred) -> 'a
   abstract member RootSupervisor : ISupervisor
+  abstract member RegisterScheduler : scheduler : IScheduler -> ISchedulerRegistration
+and 'a SupervisedCallback = ISupervisor * ('a -> unit)
 and [<Interface>] ISupervisor =
   abstract member Dispatcher : IDispatcher
   abstract member Parent : ISupervisor option
@@ -15,7 +20,21 @@ and [<Interface>] ISupervisor =
   abstract member UponException : handler : (exn -> unit) -> unit
   abstract member UponException : supervisedHandler : exn SupervisedCallback -> unit
   abstract member TryRun : f : (unit -> 'a) -> Result.T<'a, exn>
-and 'a SupervisedCallback = ISupervisor * ('a -> unit)
+and SchedulerCallback = ISupervisor * (unit -> unit IDeferred)
+and [<Interface>] IScheduler =
+  inherit IDisposable
+
+  abstract member Dispatchers : IDispatcher ICollection
+  abstract member AcceptingEnqueue : bool
+  abstract member Enqueue : schedulerCallback : SchedulerCallback -> unit
+  abstract member Take : ISchedulerTake option
+and [<Interface>] ISchedulerTake =
+  abstract member QueueDepth : int
+  abstract member RegisterEnqueuedCallback : callback : (unit -> unit) -> IRegistration
+  abstract member Dequeue : unit -> unit SupervisedCallback
+and [<Interface>] ISchedulerRegistration =
+  abstract member Update : unit -> unit
+  abstract member Remove : unit -> unit
 and [<Interface>] 'a IDeferred =
   abstract member Upon : callback : ('a -> unit) -> unit
   abstract member Upon : supervisedCallback : 'a SupervisedCallback -> unit

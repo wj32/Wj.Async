@@ -12,6 +12,7 @@
 #load "RootSupervisor.fs"
 #load "ChildSupervisor.fs"
 #load "Dispatcher.fs"
+#load "Scheduler.fs"
 #load "Parallelism.fs"
 #load "ThreadType.fs"
 #load "Deferred.fs"

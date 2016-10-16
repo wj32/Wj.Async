@@ -10,4 +10,4 @@ module Parallelism =
     | MultithreadedExactly of threadCount : int
     | ScheduledBy of scheduler : IScheduler
 
-  let createScheduler (t : T) : IScheduler = failwith "Not implemented"
+  val createScheduler : T -> IScheduler

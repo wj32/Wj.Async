@@ -61,6 +61,8 @@
     <Compile Include="ChildSupervisor.fs" />
     <Compile Include="Dispatcher.fsi" />
     <Compile Include="Dispatcher.fs" />
+    <Compile Include="Scheduler.fsi" />
+    <Compile Include="Scheduler.fs" />
     <Compile Include="Parallelism.fsi" />
     <Compile Include="Parallelism.fs" />
     <Compile Include="ThreadType.fs" />
