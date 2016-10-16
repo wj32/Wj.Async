@@ -28,14 +28,14 @@ module Dispatcher =
         ThreadShared.pushDispatcher t
         try
           let d = f ()
-          Deferred.upon d (fun _ ->
+          d.Upon(fun _ ->
             lock t.queueLock (fun () ->
               Monitor.Pulse(t.queueLock)
             )
           )
           let rec loop () =
             let f = lock t.queueLock (fun () ->
-              while Queue.isEmpty t.queue && not (Deferred.isDetermined d) do
+              while Queue.isEmpty t.queue && not d.IsDetermined do
                 Monitor.Wait(t.queueLock) |> ignore
               Queue.tryDequeue t.queue
             )
@@ -43,7 +43,7 @@ module Dispatcher =
             | Some (supervisor, f) ->
               match supervisor.TryRun(f) with
               | Result.Success () -> ()
-              | Result.Failure ex -> Supervisor.sendException supervisor ex
+              | Result.Failure ex -> supervisor.SendException(ex)
               loop ()
             | None ->
               d.Get()
