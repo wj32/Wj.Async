@@ -196,12 +196,12 @@ module Pipe =
     (pipe :> _ IWriter, pipe :> _ IReader)
 
   let inline createReader (f : _ -> unit IDeferred) =
-    let (writer, reader) = create ()
+    let writer, reader = create ()
     f writer >>> (fun () -> close writer)
     reader
 
   let inline createWriter (f : _ -> unit IDeferred) =
-    let (writer, reader) = create ()
+    let writer, reader = create ()
     f reader >>> (fun () -> closeReader reader)
     writer
 
@@ -341,7 +341,7 @@ module Pipe =
   let append t1 t2 = createReader (fun writer -> transferId writer t1 >>= fun () -> transferId writer t2)
 
   let inline interleaveGeneric upon iter ts =
-    let (writer, reader) = create ()
+    let writer, reader = create ()
     let mutable active = 1
     let inline increment () = active <- active + 1
     let inline decrement () = active <- active - 1; if active = 0 then close writer

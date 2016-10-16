@@ -51,7 +51,7 @@ module NetExtensions =
     t cancellation (progressEvent : IEvent<_, _>) createProgressHandler
     event createHandler start createResult
     =
-    let (writer, reader) = Pipe.create ()
+    let writer, reader = Pipe.create ()
     let mutable handler = null
     let closeWriterAndRemoveHandler () =
       match handler with

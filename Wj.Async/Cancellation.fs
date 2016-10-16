@@ -46,7 +46,7 @@ module Cancellation =
           | Cancelled -> ()
         )
 
-      member t.EmptiedCallback() =
+      member t.OnEmptyCallback() =
         match t.state with
         | Unregistered _ -> failwith "Unexpected 'Unregistered' state"
         | Registered (token, registration, callbacks) ->
@@ -68,7 +68,7 @@ module Cancellation =
               token.Register(new Action<obj>(t.CancellationCallback), Supervisor.current ())
             t.state <- Registered (token, registration, callbacks)
             let result = register callbacks
-            RegistrationList.addEmptiedCallback callbacks t.EmptiedCallback
+            RegistrationList.addOnEmptyCallback callbacks t.OnEmptyCallback
             result
         | Registered (_, _, callbacks) -> register callbacks
         | Cancelled -> execute (); empty ()

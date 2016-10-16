@@ -10,9 +10,9 @@ module RegistrationList =
     | Singly of value : 'a * rest : 'a State
     | Doubly of linkedList : 'a LinkedList
 
-  type 'a T = {mutable state : 'a State; mutable emptiedCallbacks : (unit -> unit) list}
+  type 'a T = {mutable state : 'a State; mutable onEmptyCallbacks : (unit -> unit) list}
 
-  let create () = {state = Initial; emptiedCallbacks = []}
+  let create () = {state = Initial; onEmptyCallbacks = []}
 
   let moveToFromLinkedList (toLinkedList : 'a LinkedList) (fromLinkedList : 'a LinkedList) after start =
     let rec loop (after : _ LinkedListNode) (node : _ LinkedListNode) =
@@ -63,14 +63,14 @@ module RegistrationList =
 
   let checkEmpty t =
     if isEmpty t then
-      for f in t.emptiedCallbacks do f ()
-      t.emptiedCallbacks <- []
+      for f in t.onEmptyCallbacks do f ()
+      t.onEmptyCallbacks <- []
 
-  let addEmptiedCallback t f =
+  let addOnEmptyCallback t f =
     if isEmpty t then
       f ()
     else
-      t.emptiedCallbacks <- f :: t.emptiedCallbacks
+      t.onEmptyCallbacks <- f :: t.onEmptyCallbacks
 
   let add t (x : 'a) =
     match t.state with
@@ -125,7 +125,7 @@ module RegistrationList =
   let clear t = t.state <- Initial; checkEmpty t
 
   let ofList list =
-    {state = List.foldBack (fun x acc -> Singly (x, acc)) list Initial; emptiedCallbacks = []}
+    {state = List.foldBack (fun x acc -> Singly (x, acc)) list Initial; onEmptyCallbacks = []}
 
   let toList t =
     let rec loop acc state =

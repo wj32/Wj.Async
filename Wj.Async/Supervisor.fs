@@ -3,9 +3,6 @@
 open System
 
 module Supervisor =
-  let [<Literal>] CannotAddHandlerToRoot = "Handlers cannot be registered on the root supervisor."
-  let [<Literal>] RootCannotBeDetached = "The root supervisor cannot be detached."
-
   // ISupervisor functions
   let inline dispatcher (t : ISupervisor) = t.Dispatcher
   let inline parent (t : ISupervisor) = t.Parent
@@ -17,45 +14,11 @@ module Supervisor =
     t.UponException(supervisedHandler)
   let inline tryRun (t : ISupervisor) f = t.TryRun(f)
 
-  module Child = ChildSupervisor
-
-  module Root =
-    [<ReferenceEquality>]
-    type T =
-      | Root of dispatcher : IDispatcher
-
-      interface ISupervisor with
-        member t.Dispatcher = match t with Root dispatcher -> dispatcher
-
-        member t.Parent = None
-
-        member t.Name = "Root"
-
-        member t.SendException(ex) = raise (SupervisorRootException ex)
-
-        member t.Detach() = raise (invalidOp RootCannotBeDetached)
-
-        member t.UponException(handler : exn -> unit) : unit =
-          invalidOp CannotAddHandlerToRoot
-
-        member t.UponException(supervisedHandler : exn SupervisedCallback) : unit =
-          invalidOp CannotAddHandlerToRoot
-
-        member t.TryRun(f) =
-          ThreadShared.pushSupervisor t
-          let result = Result.tryWith f
-          ThreadShared.popSupervisor t
-          result
-
-    let inline create dispatcher = Root dispatcher
-
   let current () = ThreadShared.currentSupervisor ()
 
-  let create () = Child.create "Unnamed supervisor"
+  let create () = ChildSupervisor.create "Unnamed supervisor"
 
-  let createNamed name = Child.create name
-
-  let createRoot dispatcher = Root.create dispatcher :> ISupervisor
+  let createNamed name = ChildSupervisor.create name
 
   let getExceptionDSeq t =
     DeferredSeq.create (fun writer -> uponException t (DeferredSeq.Writer.write writer))
@@ -86,8 +49,8 @@ module Supervisor =
       let supervisorForAfterDetermined =
         match afterDetermined with
         | AfterDetermined.Raise -> current ()
-        | AfterDetermined.Log -> dispatcher.RootSupervisor
-        | AfterDetermined.Ignore -> dispatcher.RootSupervisor
+        | AfterDetermined.Log -> Dispatcher.rootSupervisor dispatcher
+        | AfterDetermined.Ignore -> Dispatcher.rootSupervisor dispatcher
       uponException' t
         (supervisorForAfterDetermined, fun ex -> handleAfterDetermined afterDetermined t.Name ex)
     let result = tryRun t f
@@ -104,7 +67,7 @@ module Supervisor =
           | Some v -> writer <- None; Deferred.link v (handler ex)
           | None -> handleAfterDetermined afterDetermined t.Name ex
         )
-        Deferred.upon' d (dispatcher.RootSupervisor, fun x ->
+        Deferred.upon' d (Dispatcher.rootSupervisor dispatcher, fun x ->
           match writer with
           | Some v -> writer <- None; Deferred.set v x
           | None -> ()

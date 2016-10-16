@@ -1,5 +1,7 @@
 ﻿namespace Wj.Async
 
+open System.Threading
+
 module internal ChildSupervisor =
   [<ReferenceEquality>]
   type T =
@@ -16,20 +18,25 @@ module internal ChildSupervisor =
       member t.Name = t.name
 
       member t.SendException(ex) =
-        for (supervisor, handler) in t.handlers do
-          match supervisor.TryRun(fun () -> handler ex) with
-          | Result.Success () -> ()
-          | Result.Failure ex -> supervisor.SendException(ex)
-        match t.parent with
-        | Some parent ->
-          let ex' =
-            match ex with
-            | SupervisorChildException (supervisorNames, _) ->
-              SupervisorChildException (t.name :: supervisorNames, ex)
-            | ex ->
-              SupervisorChildException ([t.name], ex)
-          parent.SendException(ex')
-        | None -> ()
+        let processException ex =
+          for (supervisor, handler) in t.handlers do
+            match supervisor.TryRun(fun () -> handler ex) with
+            | Result.Success () -> ()
+            | Result.Failure ex -> supervisor.SendException(ex)
+          match t.parent with
+          | Some parent ->
+            let ex' =
+              match ex with
+              | SupervisorChildException (supervisorNames, _) ->
+                SupervisorChildException (t.name :: supervisorNames, ex)
+              | ex ->
+                SupervisorChildException ([t.name], ex)
+            parent.SendException(ex')
+          | None -> ()
+        if obj.ReferenceEquals(ThreadShared.currentDispatcher(), t.dispatcher) then
+          processException ex
+        else
+          t.dispatcher.Enqueue((t.dispatcher.RootSupervisor, fun () -> processException ex))
 
       member t.Detach() = t.parent <- None
 
@@ -37,7 +44,13 @@ module internal ChildSupervisor =
         (t :> ISupervisor).UponException((ThreadShared.currentSupervisor (), handler))
 
       member t.UponException(supervisedHandler) =
-        t.handlers <- supervisedHandler :: t.handlers
+        let rec loop () =
+          let baseValue = t.handlers
+          let newValue = supervisedHandler :: t.handlers
+          let currentValue = Interlocked.CompareExchange(&t.handlers, newValue, baseValue)
+          if not (obj.ReferenceEquals(currentValue, baseValue)) then
+            loop ()
+        loop ()
 
       member t.TryRun(f) =
         ThreadShared.pushSupervisor t
