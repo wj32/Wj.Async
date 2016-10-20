@@ -23,6 +23,7 @@
 #load "Pipe.fs"
 #load "Cancellation.fs"
 #load "CancellableDeferredBuilder.fs"
+#load "Throttle.fs"
 #load "Operators.fs"
 #load "IOExtensions.fs"
 #load "NetExtensions.fs"

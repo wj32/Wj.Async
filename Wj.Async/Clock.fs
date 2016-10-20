@@ -18,11 +18,19 @@ module Clock =
     v :> _ IDeferred
 
   let after (span : TimeSpan) =
-    if span.Ticks < 0L then invalidArg "span" SpanCannotBeNegative
-    afterTimer (fun callback -> new Timer(callback, (), span, Timeout.InfiniteTimeSpan))
+    if span.Ticks > 0L then
+      afterTimer (fun callback -> new Timer(callback, (), span, Timeout.InfiniteTimeSpan))
+    else if span.Ticks = 0L then
+      Deferred.unit
+    else
+      invalidArg "span" SpanCannotBeNegative
 
   let afterMs ms =
-    if ms < 0 then invalidArg "ms" SpanCannotBeNegative
-    afterTimer (fun callback -> new Timer(callback, (), ms, Timeout.Infinite))
+    if ms > 0 then
+      afterTimer (fun callback -> new Timer(callback, (), ms, Timeout.Infinite))
+    else if ms = 0 then
+      Deferred.unit
+    else
+      invalidArg "ms" SpanCannotBeNegative
 
   let at time = after (time - DateTime.Now)

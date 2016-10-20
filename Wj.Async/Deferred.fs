@@ -3,6 +3,7 @@
 open System
 open System.Threading
 open System.Threading.Tasks
+open Wj.Async.Internal
 
 module Deferred =
   let [<Literal>] DeferredNotDetermined = "The deferred result is not yet determined."
@@ -278,19 +279,19 @@ module Deferred =
   // We define tryFinally in this module because we need it for sequence processing later on.
   let tryFinally (f : unit -> _ IDeferred) (finalizer : unit -> _ IDeferred) =
     let supervisor = ThreadShared.currentSupervisor ()
-    let t = ChildSupervisor.create "tryFinally"
-    t.Detach()
-    let raiseAfterDetermined ex = raise (AfterDeterminedException (t.Name, ex))
-    let result = t.TryRun(f)
+    let childSupervisor = ChildSupervisor.create "tryFinally"
+    childSupervisor.Detach()
+    let raiseAfterDetermined ex = raise (AfterDeterminedException (childSupervisor.Name, ex))
+    let result = childSupervisor.TryRun(f)
     match result with
     | Result.Success d ->
       if isDetermined d then
-        t.UponException(raiseAfterDetermined)
+        childSupervisor.UponException(raiseAfterDetermined)
         map (finalizer ()) (fun () -> get d)
       else
         let reader = createVar ()
         let mutable writer = Some reader
-        t.UponException(fun ex ->
+        childSupervisor.UponException(fun ex ->
           match writer with
           | Some _ -> writer <- None; upon (finalizer ()) (fun () -> supervisor.SendException(ex))
           | None -> raiseAfterDetermined ex
@@ -302,7 +303,7 @@ module Deferred =
         )
         reader :> _ IDeferred
     | Result.Failure ex ->
-      t.UponException(raiseAfterDetermined)
+      childSupervisor.UponException(raiseAfterDetermined)
       upon (finalizer ()) (fun () -> supervisor.SendException(ex))
       never ()
 
@@ -421,6 +422,54 @@ module Deferred =
     let rec loop state = f state >>> (fun state -> loop state)
     loop state
 
+  let getThrottle parallelism =
+    match parallelism with
+    | Parallelism.Parallel ->
+      { new IThrottle with
+          member this.Enqueue(f) = f ()
+      }
+    | Parallelism.Sequential ->
+      let tasks = Queue.create ()
+      let mutable busy = false
+      let inline startTask f =
+        busy <- true
+        f ()
+      let inline completedTask () =
+        busy <- false
+        match Queue.tryDequeue tasks with
+        | Some f -> startTask f
+        | None -> ()
+      { new IThrottle with
+          member this.Enqueue(f) =
+            if Queue.isEmpty tasks && not busy then
+              startTask (fun () ->
+                let d = f ()
+                d >>> (fun _ -> completedTask ())
+                d
+              )
+            else
+              create (fun v ->
+                Queue.enqueue tasks (fun () ->
+                  f () >>> (fun x -> v <-- x; completedTask ())
+                )
+              )
+      }
+    | Parallelism.Throttle throttle -> throttle
+
+  let throttle p f =
+    match p with
+    | Parallelism.Parallel -> f
+    | _ ->
+      let t = getThrottle p
+      (fun x -> t.Enqueue(fun () -> f x))
+
+  let throttle2 p f =
+    match p with
+    | Parallelism.Parallel -> f
+    | _ ->
+      let t = getThrottle p
+      (fun x y -> t.Enqueue(fun () -> f x y))
+
   module Array =
     module P = Parallelism
 
@@ -457,14 +506,14 @@ module Deferred =
     let iteri p f xs =
       match p with
       | P.Sequential -> xs |> foldiInline (fun i () x -> f i x) ()
-      | P.Parallel -> xs |> Array.mapi (fun i x -> f i x) |> allUnit
+      | _ -> xs |> Array.mapi (throttle2 p f) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
 
     let mapi p f xs =
       match p with
       | P.Sequential -> mapiSequential f xs
-      | P.Parallel -> xs |> Array.mapi (fun i x -> f i x) |> all
+      | _ -> xs |> Array.mapi (throttle2 p f) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
 
@@ -512,14 +561,14 @@ module Deferred =
     let iteri p f xs =
       match p with
       | P.Sequential -> xs |> foldiList (fun i () x -> f i x) ()
-      | P.Parallel -> xs |> List.mapi (fun i x -> f i x) |> allUnit
+      | _ -> xs |> List.mapi (throttle2 p f) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
 
     let mapi p f xs =
       match p with
       | P.Sequential -> mapiListSequential f xs
-      | P.Parallel -> xs |> List.mapi (fun i x -> f i x) |> all
+      | _ -> xs |> List.mapi (throttle2 p f) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
 
@@ -586,7 +635,7 @@ module Deferred =
       | _ ->
         match p with
         | P.Sequential -> xs |> foldi (fun i () x -> f i x) ()
-        | P.Parallel -> xs |> Seq.mapi (fun i x -> f i x) |> allUnit
+        | _ -> xs |> Seq.mapi (throttle2 p f) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
 
@@ -599,7 +648,7 @@ module Deferred =
       | _ ->
         match p with
         | P.Sequential -> mapiSequential f xs
-        | P.Parallel -> xs |> Seq.mapi (fun i x -> f i x) |> all
+        | _ -> xs |> Seq.mapi (throttle2 p f) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
 

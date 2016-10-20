@@ -88,6 +88,17 @@ module Deferred =
   val repeat : f : ('state -> Repeat.T<'state, 'a> IDeferred) -> state : 'state -> 'a IDeferred
   val repeatForever : f : ('state -> 'state IDeferred) -> state : 'state -> unit
 
+  // Throttle
+
+  val throttle
+    : parallelism : Parallelism.T
+    -> f : ('a -> 'b IDeferred)
+    -> ('a -> 'b IDeferred)
+  val throttle2
+    : parallelism : Parallelism.T
+    -> f : ('a -> 'b -> 'c IDeferred)
+    -> ('a -> 'b -> 'c IDeferred)
+
   // Monad sequences
 
   module Array =
