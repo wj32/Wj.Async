@@ -17,13 +17,14 @@ module Parallelism =
     abstract member OnCompletedTask : unit -> unit
     abstract member OnQueuedTask : unit -> unit
     member Aborted : bool with get, set
-    member QueueLength : int with get
+    member QueueLength : int
     member StartTasks : unit -> int
+
     interface IParallelism
 
-  val inline sequential : unit -> IParallelism
-
-  val inline ``parallel`` : unit -> IParallelism
+  val sequential : IParallelism
+  val ``parallel`` : IParallelism
+  val createSequential : unit -> IParallelism
 
   val parallelAtMost' : maxTasks : int -> onException : OnException.T -> IParallelism
   val parallelAtMost : maxTasks : int -> IParallelism

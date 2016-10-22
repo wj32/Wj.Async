@@ -69,7 +69,7 @@ module CancellableDeferredBuilder =
       this.WhileGeneric(Deferred.upon, Deferred.bind, (fun () -> this.RaiseIfCancelled(); guard ()), body)
 
     member inline this.For(xs, body) =
-      Deferred.Seq.iter (Parallelism.sequential ()) (fun x -> this.RaiseIfCancelled(); body x) xs
+      Deferred.Seq.iter Parallelism.sequential (fun x -> this.RaiseIfCancelled(); body x) xs
 
     member inline this.For(xs, body) =
       DeferredSeq.iter' (fun x -> this.RaiseIfCancelled(); body x) xs

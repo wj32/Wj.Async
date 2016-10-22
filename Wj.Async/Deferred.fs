@@ -428,7 +428,6 @@ module Deferred =
     interface IParallelism with
       member this.Enqueue(f) = f ()
 
-  [<Sealed>]
   type SequentialParallelism() =
     let mutable tasks = None
     let mutable busy = false
@@ -464,6 +463,11 @@ module Deferred =
               f () >>> (fun x -> v <-- x; this.CompletedTask(tasks))
             )
           )
+
+  type LocallySequentialParallelism private() =
+    inherit SequentialParallelism()
+
+    static member val Unique = new LocallySequentialParallelism()
 
   let parallelize (p : IParallelism) f =
     match p with
@@ -508,14 +512,14 @@ module Deferred =
 
     let iteri (p : IParallelism) f xs =
       match p with
-      | :? SequentialParallelism -> xs |> foldiInline (fun i () x -> f i x) ()
+      | :? LocallySequentialParallelism -> xs |> foldiInline (fun i () x -> f i x) ()
       | _ -> xs |> Array.mapi (parallelize2 p f) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
 
     let mapi (p : IParallelism) f xs =
       match p with
-      | :? SequentialParallelism -> mapiSequential f xs
+      | :? LocallySequentialParallelism -> mapiSequential f xs
       | _ -> xs |> Array.mapi (parallelize2 p f) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
@@ -561,14 +565,14 @@ module Deferred =
 
     let iteri (p : IParallelism) f xs =
       match p with
-      | :? SequentialParallelism -> xs |> foldiList (fun i () x -> f i x) ()
+      | :? LocallySequentialParallelism -> xs |> foldiList (fun i () x -> f i x) ()
       | _ -> xs |> List.mapi (parallelize2 p f) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
 
     let mapi (p : IParallelism) f xs =
       match p with
-      | :? SequentialParallelism -> mapiListSequential f xs
+      | :? LocallySequentialParallelism -> mapiListSequential f xs
       | _ -> xs |> List.mapi (parallelize2 p f) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
@@ -633,7 +637,7 @@ module Deferred =
       | :? (_ array) as xs -> Array.iteri p f xs
       | _ ->
         match (p : IParallelism) with
-        | :? SequentialParallelism -> xs |> foldi (fun i () x -> f i x) ()
+        | :? LocallySequentialParallelism -> xs |> foldi (fun i () x -> f i x) ()
         | _ -> xs |> Seq.mapi (parallelize2 p f) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
@@ -646,7 +650,7 @@ module Deferred =
       | :? (_ array) as xs -> Array.mapi p f xs >>| (fun ys -> ys :> _ seq)
       | _ ->
         match (p : IParallelism) with
-        | :? SequentialParallelism -> mapiSequential f xs
+        | :? LocallySequentialParallelism -> mapiSequential f xs
         | _ -> xs |> Seq.mapi (parallelize2 p f) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs

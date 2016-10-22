@@ -58,6 +58,6 @@ module DeferredBuilder =
     member inline this.While(guard : unit -> bool IDeferred, body : unit -> unit M) =
       this.WhileGeneric(Deferred.upon, Deferred.bind, guard, body)
 
-    member inline this.For(xs, body) = Deferred.Seq.iter (Parallelism.sequential ()) body xs
+    member inline this.For(xs, body) = Deferred.Seq.iter Parallelism.sequential body xs
 
     member inline this.For(xs, body) = DeferredSeq.iter' body xs

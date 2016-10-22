@@ -156,9 +156,11 @@ module Parallelism =
       if not busy then
         this.Schedule()
 
-  let inline sequential () = new Deferred.SequentialParallelism() :> IParallelism
+  let sequential = Deferred.LocallySequentialParallelism.Unique :> IParallelism
 
-  let inline ``parallel`` () = Deferred.ParallelParallelism.Unique :> IParallelism
+  let ``parallel`` = Deferred.ParallelParallelism.Unique :> IParallelism
+
+  let createSequential () = new Deferred.SequentialParallelism() :> IParallelism
 
   let parallelAtMost' maxTasks onException =
     ParallelAtMostParallelism(maxTasks, onException) :> IParallelism

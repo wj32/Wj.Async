@@ -336,7 +336,7 @@ module Pipe =
   let drain t = foldBatchInline BatchSize.Unlimited (fun n xs -> Deferred.value (n + xs.Length)) 0 t
 
   let concat (ts : _ IReader list) =
-    createReader (fun writer -> Deferred.List.iter (Parallelism.sequential ()) (transferId writer) ts)
+    createReader (fun writer -> Deferred.List.iter Parallelism.sequential (transferId writer) ts)
 
   let append t1 t2 = createReader (fun writer -> transferId writer t1 >>= fun () -> transferId writer t2)
 

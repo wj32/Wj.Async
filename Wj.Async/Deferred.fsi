@@ -95,11 +95,16 @@ module Deferred =
 
     interface IParallelism
 
-  [<Sealed>]
   type SequentialParallelism =
     new : unit -> SequentialParallelism
 
     interface IParallelism
+
+  [<Class>]
+  type LocallySequentialParallelism =
+    inherit SequentialParallelism
+
+    static member Unique : LocallySequentialParallelism
 
   val parallelize
     : parallelism : IParallelism
