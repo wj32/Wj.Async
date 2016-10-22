@@ -59,6 +59,7 @@
     <Compile Include="ThreadShared.fs" />
     <Compile Include="RootSupervisor.fs" />
     <Compile Include="ChildSupervisor.fs" />
+    <Compile Include="IParallelism.fs" />
     <Compile Include="Dispatcher.fsi" />
     <Compile Include="Dispatcher.fs" />
     <Compile Include="ThreadType.fs" />

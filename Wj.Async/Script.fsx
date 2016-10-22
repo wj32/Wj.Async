@@ -11,6 +11,7 @@
 #load "ThreadShared.fs"
 #load "RootSupervisor.fs"
 #load "ChildSupervisor.fs"
+#load "IParallelism.fs"
 #load "Dispatcher.fs"
 #load "ThreadType.fs"
 #load "Deferred.fs"
