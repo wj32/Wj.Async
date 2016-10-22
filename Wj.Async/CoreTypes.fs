@@ -27,7 +27,7 @@ and [<Interface>] 'a IDeferred =
   abstract member TryGet : unit -> 'a option
 
 [<Interface>]
-type IThrottle =
+type IParallelism =
     abstract member Enqueue : f : (unit -> 'a IDeferred) -> 'a IDeferred
 
 exception AfterDeterminedException of supervisorName : string * innerException : exn

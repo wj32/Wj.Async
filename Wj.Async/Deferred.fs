@@ -422,57 +422,60 @@ module Deferred =
     let rec loop state = f state >>> (fun state -> loop state)
     loop state
 
-  let getThrottle parallelism =
-    match parallelism with
-    | Parallelism.Parallel ->
-      { new IThrottle with
-          member this.Enqueue(f) = f ()
-      }
-    | Parallelism.Sequential ->
-      let tasks = Queue.create ()
-      let mutable busy = false
-      let inline startTask f =
-        busy <- true
-        f ()
-      let inline completedTask () =
-        busy <- false
-        match Queue.tryDequeue tasks with
-        | Some f -> startTask f
-        | None -> ()
-      { new IThrottle with
-          member this.Enqueue(f) =
-            if Queue.isEmpty tasks && not busy then
-              startTask (fun () ->
-                let d = f ()
-                d >>> (fun _ -> completedTask ())
-                d
-              )
-            else
-              create (fun v ->
-                Queue.enqueue tasks (fun () ->
-                  f () >>> (fun x -> v <-- x; completedTask ())
-                )
-              )
-      }
-    | Parallelism.Throttle throttle -> throttle
+  type ParallelParallelism =
+    | Unique
 
-  let throttle p f =
-    match p with
-    | Parallelism.Parallel -> f
-    | _ ->
-      let t = getThrottle p
-      (fun x -> t.Enqueue(fun () -> f x))
+    interface IParallelism with
+      member this.Enqueue(f) = f ()
 
-  let throttle2 p f =
+  [<Sealed>]
+  type SequentialParallelism() =
+    let mutable tasks = None
+    let mutable busy = false
+
+    member inline this.StartTask(f) =
+      busy <- true
+      f ()
+
+    member inline this.CompletedTask(tasks) =
+      busy <- false
+      match Queue.tryDequeue tasks with
+      | Some f -> this.StartTask(f)
+      | None -> ()
+
+    interface IParallelism with
+      member this.Enqueue(f) =
+        let tasks =
+          match tasks with
+          | Some tasks -> tasks
+          | None ->
+            let value = Queue.create ()
+            tasks <- Some value
+            value
+        if Queue.isEmpty tasks && not busy then
+          this.StartTask(fun () ->
+            let d = f ()
+            d >>> (fun _ -> this.CompletedTask(tasks))
+            d
+          )
+        else
+          create (fun v ->
+            Queue.enqueue tasks (fun () ->
+              f () >>> (fun x -> v <-- x; this.CompletedTask(tasks))
+            )
+          )
+
+  let parallelize (p : IParallelism) f =
     match p with
-    | Parallelism.Parallel -> f
-    | _ ->
-      let t = getThrottle p
-      (fun x y -> t.Enqueue(fun () -> f x y))
+    | :? ParallelParallelism -> f
+    | _ -> (fun x -> p.Enqueue(fun () -> f x))
+
+  let parallelize2 (p : IParallelism) f =
+    match p with
+    | :? ParallelParallelism -> f
+    | _ -> (fun x y -> p.Enqueue(fun () -> f x y))
 
   module Array =
-    module P = Parallelism
-
     let inline foldiInline (f : _ -> _ -> _ -> _ IDeferred) state xs =
       let n = Array.length xs
       if n = 0 then
@@ -503,17 +506,17 @@ module Deferred =
 
     let allUnit ts = foldiInline (fun i () t -> t) () ts
 
-    let iteri p f xs =
+    let iteri (p : IParallelism) f xs =
       match p with
-      | P.Sequential -> xs |> foldiInline (fun i () x -> f i x) ()
-      | _ -> xs |> Array.mapi (throttle2 p f) |> allUnit
+      | :? SequentialParallelism -> xs |> foldiInline (fun i () x -> f i x) ()
+      | _ -> xs |> Array.mapi (parallelize2 p f) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
 
-    let mapi p f xs =
+    let mapi (p : IParallelism) f xs =
       match p with
-      | P.Sequential -> mapiSequential f xs
-      | _ -> xs |> Array.mapi (throttle2 p f) |> all
+      | :? SequentialParallelism -> mapiSequential f xs
+      | _ -> xs |> Array.mapi (parallelize2 p f) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
 
@@ -548,8 +551,6 @@ module Deferred =
       xs |> tryPick (fun x -> f x >>| (fun b -> if b then Some x else None))
 
   module List =
-    module P = Parallelism
-
     let foldi f state xs = foldiList f state xs
 
     let fold f state xs = foldiList (fun i args -> f args) state xs
@@ -558,17 +559,17 @@ module Deferred =
 
     let allUnit ts = allUnit ts
 
-    let iteri p f xs =
+    let iteri (p : IParallelism) f xs =
       match p with
-      | P.Sequential -> xs |> foldiList (fun i () x -> f i x) ()
-      | _ -> xs |> List.mapi (throttle2 p f) |> allUnit
+      | :? SequentialParallelism -> xs |> foldiList (fun i () x -> f i x) ()
+      | _ -> xs |> List.mapi (parallelize2 p f) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
 
-    let mapi p f xs =
+    let mapi (p : IParallelism) f xs =
       match p with
-      | P.Sequential -> mapiListSequential f xs
-      | _ -> xs |> List.mapi (throttle2 p f) |> all
+      | :? SequentialParallelism -> mapiListSequential f xs
+      | _ -> xs |> List.mapi (parallelize2 p f) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
 
@@ -598,8 +599,6 @@ module Deferred =
       xs |> tryPick (fun x -> f x >>| (fun b -> if b then Some x else None))
 
   module Seq =
-    module P = Parallelism
-
     let foldi (f : _ -> _ -> _ -> _ IDeferred) state (xs : _ seq) =
       match xs with
       | :? (_ list) as xs -> List.foldi f state xs
@@ -633,9 +632,9 @@ module Deferred =
       | :? (_ list) as xs -> List.iteri p f xs
       | :? (_ array) as xs -> Array.iteri p f xs
       | _ ->
-        match p with
-        | P.Sequential -> xs |> foldi (fun i () x -> f i x) ()
-        | _ -> xs |> Seq.mapi (throttle2 p f) |> allUnit
+        match (p : IParallelism) with
+        | :? SequentialParallelism -> xs |> foldi (fun i () x -> f i x) ()
+        | _ -> xs |> Seq.mapi (parallelize2 p f) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
 
@@ -646,9 +645,9 @@ module Deferred =
       | :? (_ list) as xs -> List.mapi p f xs >>| (fun ys -> ys :> _ seq)
       | :? (_ array) as xs -> Array.mapi p f xs >>| (fun ys -> ys :> _ seq)
       | _ ->
-        match p with
-        | P.Sequential -> mapiSequential f xs
-        | _ -> xs |> Seq.mapi (throttle2 p f) |> all
+        match (p : IParallelism) with
+        | :? SequentialParallelism -> mapiSequential f xs
+        | _ -> xs |> Seq.mapi (parallelize2 p f) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
 

@@ -88,14 +88,25 @@ module Deferred =
   val repeat : f : ('state -> Repeat.T<'state, 'a> IDeferred) -> state : 'state -> 'a IDeferred
   val repeatForever : f : ('state -> 'state IDeferred) -> state : 'state -> unit
 
-  // Throttle
+  // Parallelism
 
-  val throttle
-    : parallelism : Parallelism.T
+  type ParallelParallelism =
+    | Unique
+
+    interface IParallelism
+
+  [<Sealed>]
+  type SequentialParallelism =
+    new : unit -> SequentialParallelism
+
+    interface IParallelism
+
+  val parallelize
+    : parallelism : IParallelism
     -> f : ('a -> 'b IDeferred)
     -> ('a -> 'b IDeferred)
-  val throttle2
-    : parallelism : Parallelism.T
+  val parallelize2
+    : parallelism : IParallelism
     -> f : ('a -> 'b -> 'c IDeferred)
     -> ('a -> 'b -> 'c IDeferred)
 
@@ -104,14 +115,14 @@ module Deferred =
   module Array =
     val foldi : folder : (int -> 'state -> 'a -> 'state IDeferred) -> state : 'state -> s : 'a array -> 'state IDeferred
     val fold : folder : ('state -> 'a -> 'state IDeferred) -> state : 'state -> s : 'a array -> 'state IDeferred
-    val iteri : parallelism : Parallelism.T -> action : (int -> 'a -> unit IDeferred) -> s : 'a array -> unit IDeferred
-    val iter : parallelism : Parallelism.T -> action : ('a -> unit IDeferred) -> s : 'a array -> unit IDeferred
-    val mapi : parallelism : Parallelism.T -> mapping : (int -> 'a -> 'b IDeferred) -> s : 'a array -> 'b array IDeferred
-    val map : parallelism : Parallelism.T -> mapping : ('a -> 'b IDeferred) -> s : 'a array -> 'b array IDeferred
-    val init : parallelism : Parallelism.T -> length : int -> initializer : (int -> 'a IDeferred) -> 'a array IDeferred
-    val collect : parallelism : Parallelism.T -> mapping : ('a -> 'b array IDeferred) -> s : 'a array -> 'b array IDeferred
-    val choose : parallelism : Parallelism.T -> chooser : ('a -> 'b option IDeferred) -> s : 'a array -> 'b array IDeferred
-    val filter : parallelism : Parallelism.T -> predicate : ('a -> bool IDeferred) -> s : 'a array -> 'a array IDeferred
+    val iteri : parallelism : IParallelism -> action : (int -> 'a -> unit IDeferred) -> s : 'a array -> unit IDeferred
+    val iter : parallelism : IParallelism -> action : ('a -> unit IDeferred) -> s : 'a array -> unit IDeferred
+    val mapi : parallelism : IParallelism -> mapping : (int -> 'a -> 'b IDeferred) -> s : 'a array -> 'b array IDeferred
+    val map : parallelism : IParallelism -> mapping : ('a -> 'b IDeferred) -> s : 'a array -> 'b array IDeferred
+    val init : parallelism : IParallelism -> length : int -> initializer : (int -> 'a IDeferred) -> 'a array IDeferred
+    val collect : parallelism : IParallelism -> mapping : ('a -> 'b array IDeferred) -> s : 'a array -> 'b array IDeferred
+    val choose : parallelism : IParallelism -> chooser : ('a -> 'b option IDeferred) -> s : 'a array -> 'b array IDeferred
+    val filter : parallelism : IParallelism -> predicate : ('a -> bool IDeferred) -> s : 'a array -> 'a array IDeferred
     val tryPick : chooser : ('a -> 'b option IDeferred) -> s : 'a array -> 'b option IDeferred
     val tryFind : predicate : ('a -> bool IDeferred) -> s : 'a array -> 'a option IDeferred
     val all : s : 'a IDeferred array -> 'a array IDeferred
@@ -120,14 +131,14 @@ module Deferred =
   module List =
     val foldi : folder : (int -> 'state -> 'a -> 'state IDeferred) -> state : 'state -> s : 'a list -> 'state IDeferred
     val fold : folder : ('state -> 'a -> 'state IDeferred) -> state : 'state -> s : 'a list -> 'state IDeferred
-    val iteri : parallelism : Parallelism.T -> action : (int -> 'a -> unit IDeferred) -> s : 'a list -> unit IDeferred
-    val iter : parallelism : Parallelism.T -> action : ('a -> unit IDeferred) -> s : 'a list -> unit IDeferred
-    val mapi : parallelism : Parallelism.T -> mapping : (int -> 'a -> 'b IDeferred) -> s : 'a list -> 'b list IDeferred
-    val map : parallelism : Parallelism.T -> mapping : ('a -> 'b IDeferred) -> s : 'a list -> 'b list IDeferred
-    val init : parallelism : Parallelism.T -> length : int -> initializer : (int -> 'a IDeferred) -> 'a list IDeferred
-    val collect : parallelism : Parallelism.T -> mapping : ('a -> 'b list IDeferred) -> s : 'a list -> 'b list IDeferred
-    val choose : parallelism : Parallelism.T -> chooser : ('a -> 'b option IDeferred) -> s : 'a list -> 'b list IDeferred
-    val filter : parallelism : Parallelism.T -> predicate : ('a -> bool IDeferred) -> s : 'a list -> 'a list IDeferred
+    val iteri : parallelism : IParallelism -> action : (int -> 'a -> unit IDeferred) -> s : 'a list -> unit IDeferred
+    val iter : parallelism : IParallelism -> action : ('a -> unit IDeferred) -> s : 'a list -> unit IDeferred
+    val mapi : parallelism : IParallelism -> mapping : (int -> 'a -> 'b IDeferred) -> s : 'a list -> 'b list IDeferred
+    val map : parallelism : IParallelism -> mapping : ('a -> 'b IDeferred) -> s : 'a list -> 'b list IDeferred
+    val init : parallelism : IParallelism -> length : int -> initializer : (int -> 'a IDeferred) -> 'a list IDeferred
+    val collect : parallelism : IParallelism -> mapping : ('a -> 'b list IDeferred) -> s : 'a list -> 'b list IDeferred
+    val choose : parallelism : IParallelism -> chooser : ('a -> 'b option IDeferred) -> s : 'a list -> 'b list IDeferred
+    val filter : parallelism : IParallelism -> predicate : ('a -> bool IDeferred) -> s : 'a list -> 'a list IDeferred
     val tryPick : chooser : ('a -> 'b option IDeferred) -> s : 'a list -> 'b option IDeferred
     val tryFind : predicate : ('a -> bool IDeferred) -> s : 'a list -> 'a option IDeferred
     val all : s : 'a IDeferred list -> 'a list IDeferred
@@ -136,14 +147,14 @@ module Deferred =
   module Seq =
     val foldi : folder : (int -> 'state -> 'a -> 'state IDeferred) -> state : 'state -> s : 'a seq -> 'state IDeferred
     val fold : folder : ('state -> 'a -> 'state IDeferred) -> state : 'state -> s : 'a seq -> 'state IDeferred
-    val iteri : parallelism : Parallelism.T -> action : (int -> 'a -> unit IDeferred) -> s : 'a seq -> unit IDeferred
-    val iter : parallelism : Parallelism.T -> action : ('a -> unit IDeferred) -> s : 'a seq -> unit IDeferred
-    val mapi : parallelism : Parallelism.T -> mapping : (int -> 'a -> 'b IDeferred) -> s : 'a seq -> 'b seq IDeferred
-    val map : parallelism : Parallelism.T -> mapping : ('a -> 'b IDeferred) -> s : 'a seq -> 'b seq IDeferred
-    val init : parallelism : Parallelism.T -> length : int -> initializer : (int -> 'a IDeferred) -> 'a seq IDeferred
-    val collect : parallelism : Parallelism.T -> mapping : ('a -> IDeferred<#seq<'b>>) -> s : 'a seq -> 'b seq IDeferred
-    val choose : parallelism : Parallelism.T -> chooser : ('a -> 'b option IDeferred) -> s : 'a seq -> 'b seq IDeferred
-    val filter : parallelism : Parallelism.T -> predicate : ('a -> bool IDeferred) -> s : 'a seq -> 'a seq IDeferred
+    val iteri : parallelism : IParallelism -> action : (int -> 'a -> unit IDeferred) -> s : 'a seq -> unit IDeferred
+    val iter : parallelism : IParallelism -> action : ('a -> unit IDeferred) -> s : 'a seq -> unit IDeferred
+    val mapi : parallelism : IParallelism -> mapping : (int -> 'a -> 'b IDeferred) -> s : 'a seq -> 'b seq IDeferred
+    val map : parallelism : IParallelism -> mapping : ('a -> 'b IDeferred) -> s : 'a seq -> 'b seq IDeferred
+    val init : parallelism : IParallelism -> length : int -> initializer : (int -> 'a IDeferred) -> 'a seq IDeferred
+    val collect : parallelism : IParallelism -> mapping : ('a -> IDeferred<#seq<'b>>) -> s : 'a seq -> 'b seq IDeferred
+    val choose : parallelism : IParallelism -> chooser : ('a -> 'b option IDeferred) -> s : 'a seq -> 'b seq IDeferred
+    val filter : parallelism : IParallelism -> predicate : ('a -> bool IDeferred) -> s : 'a seq -> 'a seq IDeferred
     val tryPick : chooser : ('a -> 'b option IDeferred) -> s : 'a seq -> 'b option IDeferred
     val tryFind : predicate : ('a -> bool IDeferred) -> s : 'a seq -> 'a option IDeferred
     val all : s : 'a IDeferred seq -> 'a seq IDeferred
