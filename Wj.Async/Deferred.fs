@@ -429,14 +429,14 @@ module Deferred =
       member this.Enqueue(f) = f ()
 
   type SequentialParallelism() =
-    let mutable tasks = None
+    let tasks = Queue.create ()
     let mutable busy = false
 
     member inline this.StartTask(f) =
       busy <- true
       f ()
 
-    member inline this.CompletedTask(tasks) =
+    member inline this.CompletedTask() =
       busy <- false
       match Queue.tryDequeue tasks with
       | Some f -> this.StartTask(f)
@@ -444,23 +444,16 @@ module Deferred =
 
     interface IParallelism with
       member this.Enqueue(f) =
-        let tasks =
-          match tasks with
-          | Some tasks -> tasks
-          | None ->
-            let value = Queue.create ()
-            tasks <- Some value
-            value
         if Queue.isEmpty tasks && not busy then
           this.StartTask(fun () ->
             let d = f ()
-            d >>> (fun _ -> this.CompletedTask(tasks))
+            d >>> (fun _ -> this.CompletedTask())
             d
           )
         else
           create (fun v ->
             Queue.enqueue tasks (fun () ->
-              f () >>> (fun x -> v <-- x; this.CompletedTask(tasks))
+              f () >>> (fun x -> v <-- x; this.CompletedTask())
             )
           )
 
