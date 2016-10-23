@@ -462,15 +462,15 @@ module Deferred =
 
     static member val Unique = new LocallySequentialConcurrency()
 
-  let concurrently (p : IConcurrency) f =
-    match p with
+  let concurrently (c : IConcurrency) f =
+    match c with
     | :? ConcurrentConcurrency -> f
-    | _ -> (fun x -> p.Enqueue(fun () -> f x))
+    | _ -> (fun x -> c.Enqueue(fun () -> f x))
 
-  let concurrently2 (p : IConcurrency) f =
-    match p with
+  let concurrently2 (c : IConcurrency) f =
+    match c with
     | :? ConcurrentConcurrency -> f
-    | _ -> (fun x y -> p.Enqueue(fun () -> f x y))
+    | _ -> (fun x y -> c.Enqueue(fun () -> f x y))
 
   module Array =
     let inline foldiInline (f : _ -> _ -> _ -> _ IDeferred) state xs =
@@ -503,32 +503,32 @@ module Deferred =
 
     let allUnit ts = foldiInline (fun i () t -> t) () ts
 
-    let iteri (p : IConcurrency) f xs =
-      match p with
+    let iteri (c : IConcurrency) f xs =
+      match c with
       | :? LocallySequentialConcurrency -> xs |> foldiInline (fun i () x -> f i x) ()
-      | _ -> xs |> Array.mapi (concurrently2 p f) |> allUnit
+      | _ -> xs |> Array.mapi (concurrently2 c f) |> allUnit
 
-    let iter p f xs = iteri p (fun i args -> f args) xs
+    let iter c f xs = iteri c (fun i args -> f args) xs
 
-    let mapi (p : IConcurrency) f xs =
-      match p with
+    let mapi (c : IConcurrency) f xs =
+      match c with
       | :? LocallySequentialConcurrency -> mapiSequential f xs
-      | _ -> xs |> Array.mapi (concurrently2 p f) |> all
+      | _ -> xs |> Array.mapi (concurrently2 c f) |> all
 
-    let map p f xs = mapi p (fun i args -> f args) xs
+    let map c f xs = mapi c (fun i args -> f args) xs
 
-    let init p length f = Array.init length id |> map p f
+    let init c length f = Array.init length id |> map c f
 
-    let collect p f xs = map p f xs >>| Array.concat
+    let collect c f xs = map c f xs >>| Array.concat
 
-    let choose p f xs = map p f xs >>| Array.choose id
+    let choose c f xs = map c f xs >>| Array.choose id
 
     let filter2 xs bs =
       let list = new System.Collections.Generic.List<_>()
       Array.iter2 (fun x b -> if b then list.Add(x)) xs bs
       list.ToArray()
 
-    let filter p f xs = map p f xs >>| filter2 xs
+    let filter c f xs = map c f xs >>| filter2 xs
 
     let tryPick (f : _ -> _ option IDeferred) xs =
       let n = Array.length xs
@@ -556,29 +556,29 @@ module Deferred =
 
     let allUnit ts = allUnit ts
 
-    let iteri (p : IConcurrency) f xs =
-      match p with
+    let iteri (c : IConcurrency) f xs =
+      match c with
       | :? LocallySequentialConcurrency -> xs |> foldiList (fun i () x -> f i x) ()
-      | _ -> xs |> List.mapi (concurrently2 p f) |> allUnit
+      | _ -> xs |> List.mapi (concurrently2 c f) |> allUnit
 
-    let iter p f xs = iteri p (fun i args -> f args) xs
+    let iter c f xs = iteri c (fun i args -> f args) xs
 
-    let mapi (p : IConcurrency) f xs =
-      match p with
+    let mapi (c : IConcurrency) f xs =
+      match c with
       | :? LocallySequentialConcurrency -> mapiListSequential f xs
-      | _ -> xs |> List.mapi (concurrently2 p f) |> all
+      | _ -> xs |> List.mapi (concurrently2 c f) |> all
 
-    let map p f xs = mapi p (fun i args -> f args) xs
+    let map c f xs = mapi c (fun i args -> f args) xs
 
-    let init p length f = List.init length id |> map p f
+    let init c length f = List.init length id |> map c f
 
-    let collect p f xs = map p f xs >>| List.concat
+    let collect c f xs = map c f xs >>| List.concat
 
-    let choose p f xs = map p f xs >>| List.choose id
+    let choose c f xs = map c f xs >>| List.choose id
 
     let filter2 xs bs = List.foldBack2 (fun x b acc -> if b then x :: acc else acc) xs bs []
 
-    let filter p f xs = map p f xs >>| filter2 xs
+    let filter c f xs = map c f xs >>| filter2 xs
 
     let tryPick (f : _ -> _ option IDeferred) xs =
       match xs with
@@ -624,42 +624,42 @@ module Deferred =
 
     let allUnit ts = foldi (fun i () t -> t) () ts
 
-    let iteri p f (xs : _ seq) =
+    let iteri (c : IConcurrency) f (xs : _ seq) =
       match xs with
-      | :? (_ list) as xs -> List.iteri p f xs
-      | :? (_ array) as xs -> Array.iteri p f xs
+      | :? (_ list) as xs -> List.iteri c f xs
+      | :? (_ array) as xs -> Array.iteri c f xs
       | _ ->
-        match (p : IConcurrency) with
+        match c with
         | :? LocallySequentialConcurrency -> xs |> foldi (fun i () x -> f i x) ()
-        | _ -> xs |> Seq.mapi (concurrently2 p f) |> allUnit
+        | _ -> xs |> Seq.mapi (concurrently2 c f) |> allUnit
 
-    let iter p f xs = iteri p (fun i args -> f args) xs
+    let iter c f xs = iteri c (fun i args -> f args) xs
 
-    let mapi p f (xs : _ seq) =
+    let mapi (c : IConcurrency) f (xs : _ seq) =
       // TODO: Remove upcasts when xs is a list or array, after F# gets support for covariance in
       // generics.
       match xs with
-      | :? (_ list) as xs -> List.mapi p f xs >>| (fun ys -> ys :> _ seq)
-      | :? (_ array) as xs -> Array.mapi p f xs >>| (fun ys -> ys :> _ seq)
+      | :? (_ list) as xs -> List.mapi c f xs >>| (fun ys -> ys :> _ seq)
+      | :? (_ array) as xs -> Array.mapi c f xs >>| (fun ys -> ys :> _ seq)
       | _ ->
-        match (p : IConcurrency) with
+        match c with
         | :? LocallySequentialConcurrency -> mapiSequential f xs
-        | _ -> xs |> Seq.mapi (concurrently2 p f) |> all
+        | _ -> xs |> Seq.mapi (concurrently2 c f) |> all
 
-    let map p f xs = mapi p (fun i args -> f args) xs
+    let map c f xs = mapi c (fun i args -> f args) xs
 
-    let init p length f = Seq.init length id |> map p f
+    let init c length f = Seq.init length id |> map c f
 
-    let collect p f xs = map p f xs >>| Seq.concat
+    let collect c f xs = map c f xs >>| Seq.concat
 
-    let choose p f xs = map p f xs >>| Seq.choose id
+    let choose c f xs = map c f xs >>| Seq.choose id
 
     let filter2 xs bs =
       let list = new System.Collections.Generic.List<_>()
       Seq.iter2 (fun x b -> if b then list.Add(x)) xs bs
       list :> _ seq
 
-    let filter p f xs = map p f xs >>| filter2 xs
+    let filter c f xs = map c f xs >>| filter2 xs
 
     let tryPick (f : _ -> _ option IDeferred) (xs : _ seq) =
       match xs with
