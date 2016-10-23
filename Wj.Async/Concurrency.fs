@@ -3,20 +3,20 @@
 open System
 open Wj.Async.Internal
 
-module Parallelism =
+module Concurrency =
   open Deferred.Infix
 
   let [<Literal>] SpanCannotBeNegative = "The time span value cannot be negative."
 
-  // IParallelism functions
-  let enqueue (t : IParallelism) f = t.Enqueue(f)
+  // IConcurrency functions
+  let enqueue (t : IConcurrency) f = t.Enqueue(f)
 
   module OnException =
     type T = Stop | Continue
 
   [<AbstractClass>]
-  type QueueParallelism private(uponException : exn -> unit) =
-    let childSupervisor = ChildSupervisor.create "QueueParallelism"
+  type QueueConcurrency private(uponException : exn -> unit) =
+    let childSupervisor = ChildSupervisor.create "QueueConcurrency"
     let tasks = Queue.create ()
 
     do
@@ -34,7 +34,7 @@ module Parallelism =
 
     new(onException) as this =
       let supervisor = ThreadShared.currentSupervisor ()
-      QueueParallelism(fun ex ->
+      QueueConcurrency(fun ex ->
         match onException with
         | OnException.Stop ->
           if not this.Aborted then
@@ -58,7 +58,7 @@ module Parallelism =
         count <- count + 1
       count
 
-    interface IParallelism with
+    interface IConcurrency with
       member this.Enqueue(f) =
         if not this.Aborted then
           if Queue.isEmpty this.Tasks && this.CanStartTask() then
@@ -76,8 +76,8 @@ module Parallelism =
         else
           Deferred.never ()
 
-  type ParallelAtMostParallelism(maxTasks, onException) =
-    inherit QueueParallelism(onException)
+  type ConcurrentAtMostConcurrency(maxTasks, onException) =
+    inherit QueueConcurrency(onException)
 
     let mutable currentTasks = 0
 
@@ -89,8 +89,8 @@ module Parallelism =
 
     override this.OnQueuedTask() = ()
 
-  type ParallelAtMostStartedPerParallelism(maxTasks, span : TimeSpan, onException) =
-    inherit QueueParallelism(onException)
+  type ConcurrentAtMostStartedPerConcurrency(maxTasks, span : TimeSpan, onException) =
+    inherit QueueConcurrency(onException)
 
     let stopwatch = new System.Diagnostics.Stopwatch()
     let timestamps = Queue.create ()
@@ -118,8 +118,8 @@ module Parallelism =
 
     override this.OnQueuedTask() = ()
 
-  type SequentialAtMostOneStartedPerParallelism(span : TimeSpan, onException) =
-    inherit QueueParallelism(onException)
+  type SequentialAtMostOneStartedPerConcurrency(span : TimeSpan, onException) =
+    inherit QueueConcurrency(onException)
 
     let stopwatch = new System.Diagnostics.Stopwatch()
     let mutable busy = false
@@ -156,24 +156,24 @@ module Parallelism =
       if not busy then
         this.Schedule()
 
-  let sequential = Deferred.LocallySequentialParallelism.Unique :> IParallelism
+  let sequential = Deferred.LocallySequentialConcurrency.Unique :> IConcurrency
 
-  let ``parallel`` = Deferred.ParallelParallelism.Unique :> IParallelism
+  let concurrent = Deferred.ConcurrentConcurrency.Unique :> IConcurrency
 
-  let createSequential () = new Deferred.SequentialParallelism() :> IParallelism
+  let createSequential () = new Deferred.SequentialConcurrency() :> IConcurrency
 
-  let parallelAtMost' maxTasks onException =
-    ParallelAtMostParallelism(maxTasks, onException) :> IParallelism
+  let concurrentAtMost' maxTasks onException =
+    ConcurrentAtMostConcurrency(maxTasks, onException) :> IConcurrency
 
-  let parallelAtMost maxTasks = parallelAtMost' maxTasks OnException.Stop
+  let concurrentAtMost maxTasks = concurrentAtMost' maxTasks OnException.Stop
 
-  let parallelAtMostStartedPer' maxTasks span onException =
-    ParallelAtMostStartedPerParallelism(maxTasks, span, onException) :> IParallelism
+  let concurrentAtMostStartedPer' maxTasks span onException =
+    ConcurrentAtMostStartedPerConcurrency(maxTasks, span, onException) :> IConcurrency
 
-  let parallelAtMostStartedPer maxTasks span =
-    parallelAtMostStartedPer' maxTasks span OnException.Stop
+  let concurrentAtMostStartedPer maxTasks span =
+    concurrentAtMostStartedPer' maxTasks span OnException.Stop
 
   let sequentialAtMostOneStartedPer' span onException =
-    SequentialAtMostOneStartedPerParallelism(span, onException) :> IParallelism
+    SequentialAtMostOneStartedPerConcurrency(span, onException) :> IConcurrency
 
   let sequentialAtMostOneStartedPer span = sequentialAtMostOneStartedPer' span OnException.Stop

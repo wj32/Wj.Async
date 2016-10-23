@@ -11,14 +11,14 @@
 #load "ThreadShared.fs"
 #load "RootSupervisor.fs"
 #load "ChildSupervisor.fs"
-#load "IParallelism.fs"
+#load "IConcurrency.fs"
 #load "Dispatcher.fs"
 #load "ThreadType.fs"
 #load "Deferred.fs"
 #load "DeferredSeq.fs"
 #load "Supervisor.fs"
 #load "Clock.fs"
-#load "Parallelism.fs"
+#load "Concurrency.fs"
 #load "DeferredBuilder.fs"
 #load "DeferredSeqBuilder.fs"
 #load "Pipe.fs"
@@ -243,9 +243,9 @@ let testUsing () =
 let testSequenceFunctions () =
   Dispatcher.run dispatcher (fun () -> deferred {
     let config = [(125, 1); (250, 2); (500, 3); (1000, 4); (10, 5); (20, 6); (5, 7)]
-    let! values = config |> Deferred.List.map Parallelism.sequential ((<||) waitAndReturn)
+    let! values = config |> Deferred.List.map Concurrency.sequential ((<||) waitAndReturn)
     printfn "List sequential: %A" values
-    let! values = config |> Deferred.List.map Parallelism.``parallel`` ((<||) waitAndReturn)
+    let! values = config |> Deferred.List.map Concurrency.concurrent ((<||) waitAndReturn)
     printfn "List parallel: %A" values
 
     let! three = config |> Deferred.List.tryFind (fun c -> c ||> waitAndReturn >>| ((=) 5))
@@ -254,9 +254,9 @@ let testSequenceFunctions () =
     printfn "List tryFind: %A" nothing
 
     let config = [|(125, 1); (250, 2); (500, 3); (1000, 4); (10, 5); (20, 6); (5, 7)|]
-    let! values = config |> Deferred.Array.map Parallelism.sequential ((<||) waitAndReturn)
+    let! values = config |> Deferred.Array.map Concurrency.sequential ((<||) waitAndReturn)
     printfn "Array sequential: %A" values
-    let! values = config |> Deferred.Array.map Parallelism.``parallel`` ((<||) waitAndReturn)
+    let! values = config |> Deferred.Array.map Concurrency.concurrent ((<||) waitAndReturn)
     printfn "Array parallel: %A" values
 
     let! three = config |> Deferred.Array.tryFind (fun c -> c ||> waitAndReturn >>| ((=) 5))

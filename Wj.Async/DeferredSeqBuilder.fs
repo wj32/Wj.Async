@@ -60,7 +60,7 @@ module DeferredSeqBuilder =
       this.WhileGeneric(Deferred.upon, Deferred.bind, guard, body)
 
     member inline this.For(xs, body : _ -> _ M) = fun writer ->
-      Deferred.Seq.iter Parallelism.sequential (fun x -> body x writer) xs
+      Deferred.Seq.iter Concurrency.sequential (fun x -> body x writer) xs
 
     member inline this.For(xs, body : _ -> _ M) = fun writer ->
       DeferredSeq.iter' (fun x -> body x writer) xs

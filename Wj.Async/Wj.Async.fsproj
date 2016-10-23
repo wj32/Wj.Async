@@ -59,7 +59,7 @@
     <Compile Include="ThreadShared.fs" />
     <Compile Include="RootSupervisor.fs" />
     <Compile Include="ChildSupervisor.fs" />
-    <Compile Include="IParallelism.fs" />
+    <Compile Include="IConcurrency.fs" />
     <Compile Include="Dispatcher.fsi" />
     <Compile Include="Dispatcher.fs" />
     <Compile Include="ThreadType.fs" />
@@ -71,8 +71,8 @@
     <Compile Include="Supervisor.fs" />
     <Compile Include="Clock.fsi" />
     <Compile Include="Clock.fs" />
-    <Compile Include="Parallelism.fsi" />
-    <Compile Include="Parallelism.fs" />
+    <Compile Include="Concurrency.fsi" />
+    <Compile Include="Concurrency.fs" />
     <Compile Include="DeferredBuilder.fsi" />
     <Compile Include="DeferredBuilder.fs" />
     <Compile Include="DeferredSeqBuilder.fsi" />

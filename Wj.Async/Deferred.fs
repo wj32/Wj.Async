@@ -422,13 +422,13 @@ module Deferred =
     let rec loop state = f state >>> (fun state -> loop state)
     loop state
 
-  type ParallelParallelism =
+  type ConcurrentConcurrency =
     | Unique
 
-    interface IParallelism with
+    interface IConcurrency with
       member this.Enqueue(f) = f ()
 
-  type SequentialParallelism() =
+  type SequentialConcurrency() =
     let tasks = Queue.create ()
     let mutable busy = false
 
@@ -442,7 +442,7 @@ module Deferred =
       | Some f -> this.StartTask(f)
       | None -> ()
 
-    interface IParallelism with
+    interface IConcurrency with
       member this.Enqueue(f) =
         if Queue.isEmpty tasks && not busy then
           this.StartTask(fun () ->
@@ -457,19 +457,19 @@ module Deferred =
             )
           )
 
-  type LocallySequentialParallelism private() =
-    inherit SequentialParallelism()
+  type LocallySequentialConcurrency private() =
+    inherit SequentialConcurrency()
 
-    static member val Unique = new LocallySequentialParallelism()
+    static member val Unique = new LocallySequentialConcurrency()
 
-  let parallelize (p : IParallelism) f =
+  let concurrently (p : IConcurrency) f =
     match p with
-    | :? ParallelParallelism -> f
+    | :? ConcurrentConcurrency -> f
     | _ -> (fun x -> p.Enqueue(fun () -> f x))
 
-  let parallelize2 (p : IParallelism) f =
+  let concurrently2 (p : IConcurrency) f =
     match p with
-    | :? ParallelParallelism -> f
+    | :? ConcurrentConcurrency -> f
     | _ -> (fun x y -> p.Enqueue(fun () -> f x y))
 
   module Array =
@@ -503,17 +503,17 @@ module Deferred =
 
     let allUnit ts = foldiInline (fun i () t -> t) () ts
 
-    let iteri (p : IParallelism) f xs =
+    let iteri (p : IConcurrency) f xs =
       match p with
-      | :? LocallySequentialParallelism -> xs |> foldiInline (fun i () x -> f i x) ()
-      | _ -> xs |> Array.mapi (parallelize2 p f) |> allUnit
+      | :? LocallySequentialConcurrency -> xs |> foldiInline (fun i () x -> f i x) ()
+      | _ -> xs |> Array.mapi (concurrently2 p f) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
 
-    let mapi (p : IParallelism) f xs =
+    let mapi (p : IConcurrency) f xs =
       match p with
-      | :? LocallySequentialParallelism -> mapiSequential f xs
-      | _ -> xs |> Array.mapi (parallelize2 p f) |> all
+      | :? LocallySequentialConcurrency -> mapiSequential f xs
+      | _ -> xs |> Array.mapi (concurrently2 p f) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
 
@@ -556,17 +556,17 @@ module Deferred =
 
     let allUnit ts = allUnit ts
 
-    let iteri (p : IParallelism) f xs =
+    let iteri (p : IConcurrency) f xs =
       match p with
-      | :? LocallySequentialParallelism -> xs |> foldiList (fun i () x -> f i x) ()
-      | _ -> xs |> List.mapi (parallelize2 p f) |> allUnit
+      | :? LocallySequentialConcurrency -> xs |> foldiList (fun i () x -> f i x) ()
+      | _ -> xs |> List.mapi (concurrently2 p f) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
 
-    let mapi (p : IParallelism) f xs =
+    let mapi (p : IConcurrency) f xs =
       match p with
-      | :? LocallySequentialParallelism -> mapiListSequential f xs
-      | _ -> xs |> List.mapi (parallelize2 p f) |> all
+      | :? LocallySequentialConcurrency -> mapiListSequential f xs
+      | _ -> xs |> List.mapi (concurrently2 p f) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
 
@@ -629,9 +629,9 @@ module Deferred =
       | :? (_ list) as xs -> List.iteri p f xs
       | :? (_ array) as xs -> Array.iteri p f xs
       | _ ->
-        match (p : IParallelism) with
-        | :? LocallySequentialParallelism -> xs |> foldi (fun i () x -> f i x) ()
-        | _ -> xs |> Seq.mapi (parallelize2 p f) |> allUnit
+        match (p : IConcurrency) with
+        | :? LocallySequentialConcurrency -> xs |> foldi (fun i () x -> f i x) ()
+        | _ -> xs |> Seq.mapi (concurrently2 p f) |> allUnit
 
     let iter p f xs = iteri p (fun i args -> f args) xs
 
@@ -642,9 +642,9 @@ module Deferred =
       | :? (_ list) as xs -> List.mapi p f xs >>| (fun ys -> ys :> _ seq)
       | :? (_ array) as xs -> Array.mapi p f xs >>| (fun ys -> ys :> _ seq)
       | _ ->
-        match (p : IParallelism) with
-        | :? LocallySequentialParallelism -> mapiSequential f xs
-        | _ -> xs |> Seq.mapi (parallelize2 p f) |> all
+        match (p : IConcurrency) with
+        | :? LocallySequentialConcurrency -> mapiSequential f xs
+        | _ -> xs |> Seq.mapi (concurrently2 p f) |> all
 
     let map p f xs = mapi p (fun i args -> f args) xs
 
