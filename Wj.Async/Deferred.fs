@@ -25,7 +25,7 @@ module Deferred =
   let inline tryLink (t : _ IVar) d = t.TryLink(d)
 
   let inline enqueue (supervisor : ISupervisor) f x =
-    Dispatcher.enqueue supervisor.Dispatcher (supervisor, fun () -> f x)
+    supervisor.Dispatcher.Enqueue(supervisor, fun () -> f x)
 
   module Never =
     [<ReferenceEquality>]
@@ -194,9 +194,9 @@ module Deferred =
     (fun _ ->
       try
         let x = f ()
-        Dispatcher.enqueue supervisor.Dispatcher (supervisor, fun () -> set v x)
+        supervisor.Dispatcher.Enqueue(supervisor, fun () -> set v x)
       with ex ->
-        Dispatcher.enqueue supervisor.Dispatcher (supervisor, fun () -> supervisor.SendException(ex))
+        supervisor.Dispatcher.Enqueue(supervisor, fun () -> supervisor.SendException(ex))
     )
 
   let start f =
@@ -260,11 +260,11 @@ module Deferred =
       let dispatcher = ThreadShared.currentDispatcher ()
       let mutable registrations = []
       registrations <- ts |> List.mapi (fun i t ->
-        register' t (Dispatcher.rootSupervisor dispatcher, (fun x ->
+        register' t (dispatcher.RootSupervisor, fun x ->
           if not v.IsDetermined then
             for registration in registrations do Registration.remove registration
             set v (f i x)
-        ))
+        )
       )
     )
 
@@ -313,9 +313,9 @@ module Deferred =
       Async.Start(async {
         try
           let! x = a
-          Dispatcher.enqueue supervisor.Dispatcher (supervisor, fun () -> set v x)
+          supervisor.Dispatcher.Enqueue(supervisor, fun () -> set v x)
         with ex ->
-          Dispatcher.enqueue supervisor.Dispatcher (supervisor, fun () -> supervisor.SendException(ex))
+          supervisor.Dispatcher.Enqueue(supervisor, fun () -> supervisor.SendException(ex))
       })
     )
 
@@ -323,7 +323,7 @@ module Deferred =
     let supervisor = ThreadShared.currentSupervisor ()
     create (fun v ->
       ``begin`` (new AsyncCallback(fun result ->
-        Dispatcher.enqueue supervisor.Dispatcher (supervisor, fun () -> set v (``end`` result))
+        supervisor.Dispatcher.Enqueue(supervisor, fun () -> set v (``end`` result))
       )) |> ignore
     )
 
@@ -331,7 +331,7 @@ module Deferred =
     create (fun v ->
       let supervisor = ThreadShared.currentSupervisor ()
       task.ContinueWith(Action<Task<'a>>(fun _ ->
-        Dispatcher.enqueue supervisor.Dispatcher (supervisor, fun () ->
+        supervisor.Dispatcher.Enqueue(supervisor, fun () ->
           match task.Exception with
           | null -> v.Set(task.Result)
           | _ ->
@@ -346,7 +346,7 @@ module Deferred =
     create (fun v ->
       let supervisor = ThreadShared.currentSupervisor ()
       task.ContinueWith(Action<Task>(fun _ ->
-        Dispatcher.enqueue supervisor.Dispatcher (supervisor, fun () ->
+        supervisor.Dispatcher.Enqueue(supervisor, fun () ->
           match task.Exception with
           | null ->
             // We need special handling for cancellation because Task does not raise for
@@ -396,11 +396,11 @@ module Deferred =
           | None -> setResult cs
       let mutable registrations = []
       registrations <- choices |> List.map (fun c ->
-        c.Register(ThreadShared.currentSupervisor (), (fun () ->
+        c.Register(ThreadShared.currentSupervisor (), fun () ->
           if not v.IsDetermined then
             for registration in registrations do Registration.remove registration
             setResult choices
-        ))
+        )
       )
     )
 

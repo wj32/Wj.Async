@@ -28,14 +28,14 @@ module Dispatcher =
         ThreadShared.pushDispatcher t
         try
           let d = f ()
-          d.Upon(fun _ ->
+          Deferred.upon d (fun _ ->
             lock t.queueLock (fun () ->
               Monitor.Pulse(t.queueLock)
             )
           )
           let rec loop () =
             let f = lock t.queueLock (fun () ->
-              while Queue.isEmpty t.queue && not d.IsDetermined do
+              while Queue.isEmpty t.queue && not (Deferred.isDetermined d) do
                 Monitor.Wait(t.queueLock) |> ignore
               Queue.tryDequeue t.queue
             )
@@ -46,7 +46,7 @@ module Dispatcher =
               | Result.Failure ex -> supervisor.SendException(ex)
               loop ()
             | None ->
-              d.Get()
+              Deferred.get d
           let result = loop ()
           result
         finally
@@ -64,5 +64,13 @@ module Dispatcher =
         rootSupervisor = Unchecked.defaultof<ISupervisor>; }
     t.rootSupervisor <- RootSupervisor.create t
     t :> IDispatcher
+
+  let enqueue' t supervisor (f : unit -> _ IDeferred) =
+    let rootSupervisor = rootSupervisor t
+    Deferred.create (fun v ->
+      enqueue t (supervisor, fun () ->
+        Deferred.upon' (f ()) (rootSupervisor, fun x -> Deferred.set v x)
+      )
+    )
 
   let enqueueRoot t f = enqueue t (rootSupervisor t, f)

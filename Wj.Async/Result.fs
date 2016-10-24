@@ -13,6 +13,9 @@ module Result =
 
   let ofFailure error = Failure error
 
+  let ofChoice choice =
+    match choice with Choice1Of2 x -> Success x | Choice2Of2 error -> Failure error
+
   let tryWith f =
     try
       Success (f ())

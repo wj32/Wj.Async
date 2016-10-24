@@ -60,11 +60,11 @@
     <Compile Include="RootSupervisor.fs" />
     <Compile Include="ChildSupervisor.fs" />
     <Compile Include="IConcurrency.fs" />
-    <Compile Include="Dispatcher.fsi" />
-    <Compile Include="Dispatcher.fs" />
     <Compile Include="ThreadType.fs" />
     <Compile Include="Deferred.fsi" />
     <Compile Include="Deferred.fs" />
+    <Compile Include="Dispatcher.fsi" />
+    <Compile Include="Dispatcher.fs" />
     <Compile Include="DeferredSeq.fsi" />
     <Compile Include="DeferredSeq.fs" />
     <Compile Include="Supervisor.fsi" />

@@ -9,4 +9,5 @@ module Dispatcher =
   val current : unit -> IDispatcher
   val create : unit -> IDispatcher
 
+  val enqueue' : IDispatcher -> supervisor : ISupervisor -> f : (unit -> 'a IDeferred) -> 'a IDeferred
   val enqueueRoot : IDispatcher -> f : (unit -> unit) -> unit

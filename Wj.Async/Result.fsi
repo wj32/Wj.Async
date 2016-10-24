@@ -12,6 +12,7 @@ module Result =
   val mapError : T<'a, 'error> -> ('error -> 'error2) -> T<'a, 'error2>
   val ofSuccess : 'a -> T<'a, 'error>
   val ofFailure : 'error -> T<'a, 'error>
+  val ofChoice : Choice<'a, 'error> -> T<'a, 'error>
 
   // Try with
 
