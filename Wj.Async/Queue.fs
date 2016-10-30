@@ -4,6 +4,7 @@ module Queue =
   let [<Literal>] QueueEmpty = "The queue is empty."
   let [<Literal>] LengthExceedsElements = "The specified length exceeds the number of elements in the queue."
 
+  [<ReferenceEquality>]
   type 'a T =
     { mutable data : 'a array;
       mutable head : int;

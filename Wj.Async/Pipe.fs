@@ -73,6 +73,7 @@ module Pipe =
       | Single of result : 'a option IVar
       | Batch of batchSize : BatchSize.T * result : 'a array option IVar
 
+  [<ReferenceEquality>]
   type T<'a> =
     { buffer : 'a Queue.T;
       closed : unit IVar;

@@ -10,6 +10,7 @@ module RegistrationList =
     | Singly of value : 'a * rest : 'a State
     | Doubly of linkedList : 'a LinkedList
 
+  [<ReferenceEquality>]
   type 'a T = {mutable state : 'a State; mutable onEmptyCallbacks : (unit -> unit) list}
 
   let create () = {state = Initial; onEmptyCallbacks = []}
