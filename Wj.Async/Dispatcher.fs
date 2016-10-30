@@ -23,8 +23,9 @@ module Dispatcher =
         )
 
       member t.Run(f) =
-        let supervisor = t.rootSupervisor
-        ThreadShared.pushSupervisor supervisor
+        let rootSupervisor = t.rootSupervisor
+        let mutable stop = false
+        ThreadShared.pushSupervisor rootSupervisor
         ThreadShared.pushDispatcher t
         try
           let d = f ()
@@ -34,24 +35,28 @@ module Dispatcher =
             )
           )
           let rec loop () =
-            let f = lock t.queueLock (fun () ->
+            let supervisedCallback = lock t.queueLock (fun () ->
               while Queue.isEmpty t.queue && not (Deferred.isDetermined d) do
                 Monitor.Wait(t.queueLock) |> ignore
-              Queue.tryDequeue t.queue
+              if Queue.isEmpty t.queue then
+                stop <- true
+                Unchecked.defaultof<unit SupervisedCallback>
+              else
+                Queue.dequeue t.queue
             )
-            match f with
-            | Some (supervisor, f) ->
+            if stop then
+              Deferred.get d
+            else
+              let supervisor, f = supervisedCallback
               match supervisor.TryRun(f) with
               | Result.Success () -> ()
               | Result.Failure ex -> supervisor.SendException(ex)
               loop ()
-            | None ->
-              Deferred.get d
           let result = loop ()
           result
         finally
           ThreadShared.popDispatcher t
-          ThreadShared.popSupervisor supervisor
+          ThreadShared.popSupervisor rootSupervisor
 
       member t.RootSupervisor = t.rootSupervisor
 
