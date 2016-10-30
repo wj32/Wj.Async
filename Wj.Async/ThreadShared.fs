@@ -1,46 +1,44 @@
 ﻿namespace Wj.Async
 
+open System.Collections.Generic;
 open System.Threading;
 
 module internal ThreadShared =
   [<ReferenceEquality>]
   type ThreadBlock =
-    { mutable supervisors : ISupervisor list;
-      mutable dispatchers : IDispatcher list; }
+    { supervisors : ISupervisor Stack;
+      dispatchers : IDispatcher Stack; }
 
   let currentThreadBlock =
     let threadLocal = new ThreadLocal<ThreadBlock>(fun () ->
-      { supervisors = [];
-        dispatchers = []; }
+      { supervisors = new Stack<ISupervisor>();
+        dispatchers = new Stack<IDispatcher>(); }
     )
     (fun () -> threadLocal.Value)
 
-  let currentSupervisor () = (currentThreadBlock ()).supervisors |> List.head
+  let currentSupervisor () = (currentThreadBlock ()).supervisors.Peek()
 
-  let tryCurrentSupervisor () = (currentThreadBlock ()).supervisors |> List.tryHead
+  let tryCurrentSupervisor () =
+    let supervisors = (currentThreadBlock ()).supervisors
+    if supervisors.Count <> 0 then
+      Some (supervisors.Peek())
+    else
+      None
 
-  let pushSupervisor supervisor =
-    let threadBlock = currentThreadBlock ()
-    threadBlock.supervisors <- supervisor :: threadBlock.supervisors
+  let pushSupervisor supervisor = (currentThreadBlock ()).supervisors.Push(supervisor)
 
   let popSupervisor (supervisor : ISupervisor) =
-    let threadBlock = currentThreadBlock ()
-    match threadBlock.supervisors with
-    | top :: rest when obj.ReferenceEquals(top, supervisor) ->
-      threadBlock.supervisors <- rest
-    | _ ->
+    let supervisors = (currentThreadBlock ()).supervisors
+    let top = supervisors.Pop()
+    if not (obj.ReferenceEquals(top, supervisor)) then
       failwith "Thread supervisor stack mismatch"
 
-  let currentDispatcher () = (currentThreadBlock ()).dispatchers |> List.head
+  let currentDispatcher () = (currentThreadBlock ()).dispatchers.Peek()
 
-  let pushDispatcher dispatcher =
-    let threadBlock = currentThreadBlock ()
-    threadBlock.dispatchers <- dispatcher :: threadBlock.dispatchers
+  let pushDispatcher dispatcher = (currentThreadBlock ()).dispatchers.Push(dispatcher)
 
   let popDispatcher (dispatcher : IDispatcher) =
-    let threadBlock = currentThreadBlock ()
-    match threadBlock.dispatchers with
-    | top :: rest when obj.ReferenceEquals(top, dispatcher) ->
-      threadBlock.dispatchers <- rest
-    | _ ->
+    let dispatchers = (currentThreadBlock ()).dispatchers
+    let top = dispatchers.Pop()
+    if not (obj.ReferenceEquals(top, dispatcher)) then
       failwith "Thread dispatcher stack mismatch"
