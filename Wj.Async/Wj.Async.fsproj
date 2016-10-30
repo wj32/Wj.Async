@@ -44,8 +44,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Result.fsi" />
-    <Compile Include="Result.fs" />
     <Compile Include="IRegistration.fs" />
     <Compile Include="Registration.fsi" />
     <Compile Include="Registration.fs" />

@@ -1,7 +1,6 @@
 ﻿// Learn more about F# at http://fsharp.org. See the 'F# Tutorial' project
 // for more guidance on F# programming.
 
-#load "Result.fs"
 #load "IRegistration.fs"
 #load "Registration.fs"
 #load "RegistrationList.fs"
