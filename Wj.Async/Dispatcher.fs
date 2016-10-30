@@ -77,7 +77,7 @@ module Dispatcher =
     t :> IDispatcher
 
   let enqueue' t supervisor (f : unit -> _ IDeferred) =
-    let rootSupervisor = rootSupervisor t
+    let rootSupervisor = rootSupervisor (current ())
     Deferred.create (fun v ->
       enqueue t (supervisor, fun () ->
         Deferred.upon' (f ()) (rootSupervisor, fun x -> Deferred.set v x)
