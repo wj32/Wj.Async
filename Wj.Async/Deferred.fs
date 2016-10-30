@@ -54,12 +54,16 @@ module Deferred =
   module Var =
     [<ReferenceEquality>]
     type 'a State =
-      /// The Var is not linked and does not have a value.
-      | Pending of callbacks : 'a SupervisedCallback RegistrationList.T
+      /// The Var has no value, is not linked, and has no callbacks.
+      | Pending
+      /// The Var has no value, is not linked, and has one callback (which cannot be removed).
+      | PendingOne of callback : 'a SupervisedCallback
+      /// The Var has no value, is not linked, and may have many callbacks.
+      | PendingMany of callbacks : 'a SupervisedCallback RegistrationList.T
       /// The Var is set to a value.
       | Value of value : 'a
       /// The Var is linked to a parent IDeferred.
-      /// Due to FindRoot, the parent will always be a Pending, Value or not a Var.T at all (but
+      /// Due to FindRoot, the parent will always be a Pending*, Value or not a Var.T at all (but
       /// never a Linked).
       | Linked of parent : 'a IDeferred
 
@@ -104,39 +108,61 @@ module Deferred =
 
         member t.Upon((supervisor, f) as supervisedCallback) =
           match t.state with
-          | Pending callbacks -> RegistrationList.add callbacks supervisedCallback
+          | Pending -> t.state <- PendingOne supervisedCallback
+          | PendingOne existingCallback ->
+            let callbacks = RegistrationList.create ()
+            t.state <- PendingMany callbacks
+            RegistrationList.add callbacks existingCallback
+            RegistrationList.add callbacks supervisedCallback
+          | PendingMany callbacks -> RegistrationList.add callbacks supervisedCallback
           | Value x -> enqueue supervisor f x
           | Linked parent -> upon' (T<'a>.FindRoot(parent)) supervisedCallback
 
         member t.Register(f) = (t :> _ IDeferred).Register((ThreadShared.currentSupervisor (), f))
 
         member t.Register((supervisor, f) as supervisedCallback) =
+          let inline convertAndRegister action =
+            let callbacks = RegistrationList.create ()
+            t.state <- PendingMany callbacks
+            action callbacks
+            RegistrationList.register callbacks supervisedCallback
           match t.state with
-          | Pending callbacks -> RegistrationList.register callbacks supervisedCallback
+          | Pending -> convertAndRegister ignore
+          | PendingOne callback ->
+            convertAndRegister (fun callbacks -> RegistrationList.add callbacks callback)
+          | PendingMany callbacks -> RegistrationList.register callbacks supervisedCallback
           | Value x -> enqueue supervisor f x; Registration.empty
           | Linked parent -> register' (T<'a>.FindRoot(parent)) supervisedCallback
 
         member t.MoveFrom(from) =
+          let inline convertAndMoveFrom action =
+            let callbacks = RegistrationList.create ()
+            t.state <- PendingMany callbacks
+            action callbacks
+            RegistrationList.moveFrom callbacks from
           match t.state with
-          | Pending callbacks -> RegistrationList.moveFrom callbacks from
+          | Pending -> convertAndMoveFrom ignore
+          | PendingOne callback ->
+            convertAndMoveFrom (fun callbacks -> RegistrationList.add callbacks callback)
+          | PendingMany callbacks -> RegistrationList.moveFrom callbacks from
           | Value x -> for (supervisor, f) in RegistrationList.toList from do enqueue supervisor f x
           | Linked parent -> moveFrom (T<'a>.FindRoot(parent)) from
 
         member t.IsDetermined =
           match t.state with
-          | Pending _ -> false
+          | Pending | PendingOne _ | PendingMany _ -> false
           | Value _ -> true
           | Linked parent -> isDetermined (T<'a>.FindRoot(parent))
 
         member t.Get() =
           match t.state with
-          | Pending _ -> invalidOp DeferredNotDetermined
+          | Pending | PendingOne _ | PendingMany _ -> invalidOp DeferredNotDetermined
           | Value x -> x
           | Linked parent -> get (T<'a>.FindRoot(parent))
 
         member t.TryGet() =
           match t.state with
-          | Pending _ -> None
+          | Pending | PendingOne _ | PendingMany _ -> None
           | Value x -> Some x
           | Linked parent -> tryGet (T<'a>.FindRoot(parent))
 
@@ -147,7 +173,9 @@ module Deferred =
 
         member t.TrySet(x) =
           match t.state with
-          | Pending callbacks ->
+          | Pending -> t.state <- Value x; true
+          | PendingOne (supervisor, f) -> t.state <- Value x; enqueue supervisor f x; true
+          | PendingMany callbacks ->
             t.state <- Value x
             for (supervisor, f) in RegistrationList.toList callbacks do enqueue supervisor f x
             true
@@ -158,19 +186,21 @@ module Deferred =
             invalidOp VarAlreadySetOrLinked
 
         member t.TryLink(parent) =
-          match t.state with
-          | Pending callbacks ->
+          let inline findRootAndLink action =
             let root = T<'a>.FindRoot(parent)
             if obj.ReferenceEquals(root, t) then
               // This is a cycle.
               t.state <- Linked (Never.never ())
             else
               t.state <- Linked root
-              moveFrom root callbacks
-            true
+              action root
+          match t.state with
+          | Pending -> findRootAndLink ignore; true
+          | PendingOne callback -> findRootAndLink (fun root -> upon' root callback); true
+          | PendingMany callbacks -> findRootAndLink (fun root -> moveFrom root callbacks); true
           | _ -> false
 
-    let inline createPending () = {state = Pending (RegistrationList.create ())}
+    let inline createPending () = {state = Pending}
 
     let inline createLinked d = {state = Linked d}
 
