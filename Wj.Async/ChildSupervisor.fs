@@ -20,9 +20,10 @@ module internal ChildSupervisor =
       member t.SendException(ex) =
         let processException ex =
           for (supervisor, handler) in t.handlers do
-            match supervisor.TryRun(fun () -> handler ex) with
-            | Result.Success () -> ()
-            | Result.Failure ex -> supervisor.SendException(ex)
+            try
+              supervisor.Run(fun () -> handler ex)
+            with ex ->
+              supervisor.SendException(ex)
           match t.parent with
           | Some parent ->
             let ex' =
@@ -52,11 +53,12 @@ module internal ChildSupervisor =
             loop ()
         loop ()
 
-      member t.TryRun(f) =
+      member t.Run(f) =
         ThreadShared.pushSupervisor t
-        let result = Result.tryWith f
-        ThreadShared.popSupervisor t
-        result
+        try
+          f ()
+        finally
+          ThreadShared.popSupervisor t
 
   let inline create name =
     { name = name;

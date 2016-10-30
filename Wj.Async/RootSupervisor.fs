@@ -31,10 +31,11 @@ module internal RootSupervisor =
       member t.UponException(supervisedHandler : exn SupervisedCallback) : unit =
         invalidOp CannotAddHandlerToRoot
 
-      member t.TryRun(f) =
+      member t.Run(f) =
         ThreadShared.pushSupervisor t
-        let result = Result.tryWith f
-        ThreadShared.popSupervisor t
-        result
+        try
+          f ()
+        finally
+          ThreadShared.popSupervisor t
 
   let inline create dispatcher = Root dispatcher

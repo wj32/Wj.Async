@@ -14,7 +14,7 @@ and [<Interface>] ISupervisor =
   abstract member SendException : ex : exn -> unit
   abstract member UponException : handler : (exn -> unit) -> unit
   abstract member UponException : supervisedHandler : exn SupervisedCallback -> unit
-  abstract member TryRun : f : (unit -> 'a) -> Result.T<'a, exn>
+  abstract member Run : f : (unit -> 'a) -> 'a
 and 'a SupervisedCallback = ISupervisor * ('a -> unit)
 and [<Interface>] 'a IDeferred =
   abstract member Upon : callback : ('a -> unit) -> unit

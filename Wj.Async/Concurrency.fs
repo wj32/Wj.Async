@@ -46,10 +46,10 @@ module Concurrency =
 
     member inline private this.StartTask(f, failure) =
       this.OnStartingTask()
-      let result = childSupervisor.TryRun(f)
-      match result with
-      | Result.Success x -> x
-      | Result.Failure ex -> childSupervisor.SendException(ex); failure ()
+      try
+        Supervisor.run childSupervisor f
+      with ex ->
+        Supervisor.sendException childSupervisor ex; failure ()
 
     member this.StartTasks() =
       let mutable count = 0

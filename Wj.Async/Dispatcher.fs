@@ -28,7 +28,12 @@ module Dispatcher =
         ThreadShared.pushSupervisor rootSupervisor
         ThreadShared.pushDispatcher t
         try
-          let d = f ()
+          let d =
+            try
+              f ()
+            with ex ->
+              rootSupervisor.SendException(ex)
+              Deferred.never ()
           Deferred.upon d (fun _ ->
             lock t.queueLock (fun () ->
               Monitor.Pulse(t.queueLock)
@@ -48,9 +53,10 @@ module Dispatcher =
               Deferred.get d
             else
               let supervisor, f = supervisedCallback
-              match supervisor.TryRun(f) with
-              | Result.Success () -> ()
-              | Result.Failure ex -> supervisor.SendException(ex)
+              try
+                supervisor.Run(f)
+              with ex ->
+                supervisor.SendException(ex)
               loop ()
           let result = loop ()
           result

@@ -12,7 +12,7 @@ module Supervisor =
   let inline uponException (t : ISupervisor) (handler : exn -> unit) = t.UponException(handler)
   let inline uponException' (t : ISupervisor) (supervisedHandler : exn SupervisedCallback) =
     t.UponException(supervisedHandler)
-  let inline tryRun (t : ISupervisor) f = t.TryRun(f)
+  let inline run (t : ISupervisor) f = t.Run(f)
 
   let current () = ThreadShared.currentSupervisor ()
 
@@ -26,10 +26,10 @@ module Supervisor =
   let supervise (f : unit -> _ IDeferred) observer =
     let t = createNamed "supervise"
     uponException t observer
-    let result = tryRun t f
-    match result with
-    | Result.Success d -> d
-    | Result.Failure ex -> sendException t ex; Deferred.never ()
+    try
+      run t f
+    with ex ->
+      sendException t ex; Deferred.never ()
 
   module AfterDetermined =
     type T = Raise | Log | Ignore
@@ -53,9 +53,16 @@ module Supervisor =
         | AfterDetermined.Ignore -> Dispatcher.rootSupervisor dispatcher
       uponException' t
         (supervisorForAfterDetermined, fun ex -> handleAfterDetermined afterDetermined t.Name ex)
-    let result = tryRun t f
-    match result with
-    | Result.Success d ->
+    let mutable ex = null
+    let d =
+      try
+        run t f
+      with ex' ->
+        ex <- ex'
+        Unchecked.defaultof<_ IDeferred>
+    let ex = ex // Immutable from here
+    match ex with
+    | null ->
       if Deferred.isDetermined d then
         startHandlingAfterDetermined ()
         d
@@ -73,7 +80,7 @@ module Supervisor =
           | None -> ()
         )
         reader :> _ IDeferred
-    | Result.Failure ex ->
+    | _ ->
       startHandlingAfterDetermined ()
       handler ex
 

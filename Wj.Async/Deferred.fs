@@ -312,9 +312,16 @@ module Deferred =
     let childSupervisor = ChildSupervisor.create "tryFinally"
     childSupervisor.Detach()
     let raiseAfterDetermined ex = raise (AfterDeterminedException (childSupervisor.Name, ex))
-    let result = childSupervisor.TryRun(f)
-    match result with
-    | Result.Success d ->
+    let mutable ex = null
+    let d =
+      try
+        childSupervisor.Run(f)
+      with ex' ->
+        ex <- ex'
+        Unchecked.defaultof<_ IDeferred>
+    let ex = ex // Immutable from here
+    match ex with
+    | null ->
       if isDetermined d then
         childSupervisor.UponException(raiseAfterDetermined)
         map (finalizer ()) (fun () -> get d)
@@ -332,7 +339,7 @@ module Deferred =
           | None -> ()
         )
         reader :> _ IDeferred
-    | Result.Failure ex ->
+    | _ ->
       childSupervisor.UponException(raiseAfterDetermined)
       upon (finalizer ()) (fun () -> supervisor.SendException(ex))
       never ()

@@ -11,7 +11,7 @@ module Supervisor =
   val inline sendException : ISupervisor -> ex : exn -> unit
   val inline uponException : ISupervisor -> handler : (exn -> unit) -> unit
   val inline uponException' : ISupervisor -> supervisedHandler : exn SupervisedCallback -> unit
-  val inline tryRun : ISupervisor -> f : (unit -> 'a) -> Result.T<'a, exn>
+  val inline run : ISupervisor -> f : (unit -> 'a) -> 'a
 
   val current : unit -> ISupervisor
   val create : unit -> ISupervisor
