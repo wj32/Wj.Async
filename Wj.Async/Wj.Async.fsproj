@@ -81,6 +81,8 @@
     <Compile Include="Cancellation.fs" />
     <Compile Include="CancellableDeferredBuilder.fsi" />
     <Compile Include="CancellableDeferredBuilder.fs" />
+    <Compile Include="Parallel.fsi" />
+    <Compile Include="Parallel.fs" />
     <Compile Include="Operators.fs" />
     <Compile Include="IOExtensions.fsi" />
     <Compile Include="IOExtensions.fs" />
