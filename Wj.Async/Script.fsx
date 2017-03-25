@@ -1,31 +1,7 @@
 ﻿// Learn more about F# at http://fsharp.org. See the 'F# Tutorial' project
 // for more guidance on F# programming.
 
-#load "IRegistration.fs"
-#load "Registration.fs"
-#load "RegistrationList.fs"
-#load "Queue.fs"
-#load "CoreTypes.fs"
-#load "IVar.fs"
-#load "ThreadShared.fs"
-#load "RootSupervisor.fs"
-#load "ChildSupervisor.fs"
-#load "IConcurrency.fs"
-#load "ThreadType.fs"
-#load "Deferred.fs"
-#load "Dispatcher.fs"
-#load "DeferredSeq.fs"
-#load "Supervisor.fs"
-#load "Clock.fs"
-#load "Concurrency.fs"
-#load "DeferredBuilder.fs"
-#load "DeferredSeqBuilder.fs"
-#load "Pipe.fs"
-#load "Cancellation.fs"
-#load "CancellableDeferredBuilder.fs"
-#load "Operators.fs"
-#load "IOExtensions.fs"
-#load "NetExtensions.fs"
+#r "bin/Debug/Wj.Async.dll"
 
 open Wj.Async
 open Wj.Async.Deferred.Infix
@@ -68,8 +44,8 @@ let testExceptions () =
                     Supervisor.supervise
                       (fun () -> deferred {
                         do! afterMs 500
-                        printfn "My supervisor is %s." (ThreadShared.currentSupervisor()).Name
-                        printfn "My parent supervisor is %s." (ThreadShared.currentSupervisor()).Parent.Value.Name
+                        printfn "My supervisor is %s." (Supervisor.current ()).Name
+                        printfn "My parent supervisor is %s." (Supervisor.current ()).Parent.Value.Name
                         try
                           invalidOp "Exception in inner supervisor!"
                         finally
